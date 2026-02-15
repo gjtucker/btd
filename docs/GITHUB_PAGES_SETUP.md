@@ -35,7 +35,7 @@ After the workflow finishes, your site URL is available in:
 
 ### Custom domain
 
-If you move to a custom domain, update base path behavior:
+If you move to a custom domain, the default relative base usually works unchanged.
 
 - For custom domain roots, base is often `/`.
 - If you need a specific path override, set `BASE_PATH` in the workflow build step.
@@ -48,5 +48,5 @@ If the repo name is `<user>.github.io`, deploy URL is root and base path should 
 
 - Workflow must succeed on `main`.
 - Pages source must stay set to **GitHub Actions**.
-- If assets 404, base path likely does not match the actual URL path.
+- If assets 404, verify `BASE_PATH` is not overriding the default relative base unexpectedly.
 - If deployment is blocked, check repository visibility and branch protections affecting Actions.

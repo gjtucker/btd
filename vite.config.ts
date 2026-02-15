@@ -15,6 +15,8 @@ const derivedPagesBase = (() => {
 })();
 
 export default defineConfig({
+  // Use a relative base path so the build works on both project pages
+  // (/<repo>/) and user/org pages (/), as well as custom domains.
   base: process.env.BASE_PATH ?? derivedPagesBase,
   server: {
     port: 3000,
