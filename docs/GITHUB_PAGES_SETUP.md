@@ -17,8 +17,9 @@ Key points:
 
 - Deploy runs on pushes to `main`.
 - Build output is `dist/`.
-- `BASE_PATH` is set to `/${{ github.event.repository.name }}/`, which is correct for project pages like:
-  - `https://<user>.github.io/<repo>/`
+- Build derives the Vite `base` automatically from `GITHUB_REPOSITORY`.
+  - Project pages (`https://<user>.github.io/<repo>/`) use `/<repo>/`.
+  - User/org pages (`https://<user>.github.io/`) use `/`.
 
 ## 3) Trigger first deployment
 
@@ -37,7 +38,7 @@ After the workflow finishes, your site URL is available in:
 If you move to a custom domain, update base path behavior:
 
 - For custom domain roots, base is often `/`.
-- Update `BASE_PATH` in `.github/workflows/deploy-pages.yml` to match your hosting path.
+- If you need a specific path override, set `BASE_PATH` in the workflow build step.
 
 ### User/organization site repo
 

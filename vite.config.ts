@@ -3,9 +3,16 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const githubRepository = process.env.GITHUB_REPOSITORY;
-const derivedPagesBase = githubRepository
-  ? `/${githubRepository.split('/')[1]}/`
-  : '/';
+const derivedPagesBase = (() => {
+  if (!githubRepository) return '/';
+
+  const [owner, repo] = githubRepository.split('/');
+  if (!owner || !repo) return '/';
+
+  return repo.toLowerCase() === `${owner.toLowerCase()}.github.io`
+    ? '/'
+    : `/${repo}/`;
+})();
 
 export default defineConfig({
   base: process.env.BASE_PATH ?? derivedPagesBase,
