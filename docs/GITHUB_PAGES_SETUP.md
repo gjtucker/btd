@@ -17,8 +17,7 @@ Key points:
 
 - Deploy runs on pushes to `main`.
 - Build output is `dist/`.
-- `BASE_PATH` is set to `/${{ github.event.repository.name }}/`, which is correct for project pages like:
-  - `https://<user>.github.io/<repo>/`
+- Build uses a relative Vite `base` (`./`) by default so assets resolve correctly on project pages, user/org pages, and custom domains.
 
 ## 3) Trigger first deployment
 
@@ -34,18 +33,13 @@ After the workflow finishes, your site URL is available in:
 
 ### Custom domain
 
-If you move to a custom domain, update base path behavior:
+If you move to a custom domain, the default relative base usually works unchanged.
 
-- For custom domain roots, base is often `/`.
-- Update `BASE_PATH` in `.github/workflows/deploy-pages.yml` to match your hosting path.
-
-### User/organization site repo
-
-If the repo name is `<user>.github.io`, deploy URL is root and base path should typically be `/`.
+- If you need a specific path override, set `BASE_PATH` in the workflow build step.
 
 ## 5) Troubleshooting checklist
 
 - Workflow must succeed on `main`.
 - Pages source must stay set to **GitHub Actions**.
-- If assets 404, base path likely does not match the actual URL path.
+- If assets 404, verify `BASE_PATH` is not overriding the default relative base unexpectedly.
 - If deployment is blocked, check repository visibility and branch protections affecting Actions.
