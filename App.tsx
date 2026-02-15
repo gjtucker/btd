@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
-import { ThreeRenderer } from './services/ThreeRenderer';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
-import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, TOWERS } from './constants';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, TOWERS } from './constants';
 import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
@@ -11,8 +10,8 @@ type MobilePanel = 'build' | 'intel' | 'tower';
 
 const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
-  const threeRendererRef = useRef<ThreeRenderer | null>(null);
   const requestRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
   const midiRef = useRef<MidiBackgroundMusic | null>(null);
@@ -96,21 +95,15 @@ const App: React.FC = () => {
     engineRef.current = engine;
     updateStatsRef.current();
 
-    if (containerRef.current && !threeRendererRef.current) {
-        threeRendererRef.current = new ThreeRenderer(containerRef.current);
-    }
-
-    if (threeRendererRef.current) {
-        threeRendererRef.current.initScene(MAPS[mapId]);
-    }
-
     const animate = (time: number) => {
       const dt = (time - lastTimeRef.current) / 1000;
       const safeDt = Math.min(dt, 0.1); 
       if (engineRef.current) {
         engineRef.current.update(safeDt);
-        if (threeRendererRef.current) {
-          threeRendererRef.current.render(engineRef.current);
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (ctx) {
+          engineRef.current.draw(ctx);
         }
       }
       lastTimeRef.current = time;
@@ -119,10 +112,6 @@ const App: React.FC = () => {
     requestRef.current = requestAnimationFrame(animate);
     return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        if (threeRendererRef.current) {
-            threeRendererRef.current.dispose();
-            threeRendererRef.current = null;
-        }
     };
   }, [difficulty, mapId]);
 
@@ -163,10 +152,6 @@ const App: React.FC = () => {
   const getGameCoordinates = useCallback((clientX: number, clientY: number) => {
     const screenPoint = getCanvasCoordinates(clientX, clientY);
     if (!screenPoint) return null;
-
-    if (threeRendererRef.current) {
-      return threeRendererRef.current.screenToWorld(screenPoint.x, screenPoint.y);
-    }
 
     return screenPoint;
   }, [getCanvasCoordinates]);
@@ -512,7 +497,14 @@ const App: React.FC = () => {
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               className="cursor-crosshair block w-full h-auto touch-none"
-            />
+            >
+              <canvas
+                ref={canvasRef}
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                className="block w-full h-full"
+              />
+            </div>
             {round === 1 && !isRoundActive && !selectedTowerType && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full text-xs font-bold backdrop-blur-lg pointer-events-none flex items-center gap-3 border border-slate-700 shadow-2xl animate-bounce">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
