@@ -46,6 +46,7 @@ export interface Upgrade {
     pierce?: number;
     projectileSpeed?: number;
     income?: number;
+    damageType?: DamageType;
   };
 }
 

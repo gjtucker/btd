@@ -29,6 +29,7 @@ interface Tower {
   dynamicPierce: number;
   dynamicProjectileSpeed: number;
   dynamicIncome: number;
+  dynamicDamageType: DamageType;
 }
 
 interface Projectile {
@@ -156,6 +157,7 @@ export class GameEngine {
       dynamicPierce: config.pierce,
       dynamicProjectileSpeed: config.projectileSpeed,
       dynamicIncome: config.income ?? 0,
+      dynamicDamageType: config.damageType,
     });
     this.onStateChange();
     return true;
@@ -179,6 +181,7 @@ export class GameEngine {
     if (upgrade.effect.pierce) tower.dynamicPierce += upgrade.effect.pierce;
     if (upgrade.effect.projectileSpeed) tower.dynamicProjectileSpeed += upgrade.effect.projectileSpeed;
     if (upgrade.effect.income) tower.dynamicIncome += upgrade.effect.income;
+    if (upgrade.effect.damageType) tower.dynamicDamageType = upgrade.effect.damageType;
 
     this.onStateChange();
     return true;
@@ -345,7 +348,7 @@ export class GameEngine {
 
   private fire(tower: Tower, target: Bloon) {
     if (tower.dynamicProjectileSpeed === 0) { // Hitscan
-        this.damageBloon(this.bloons.indexOf(target), tower.dynamicDamage, tower.config.damageType, tower.id);
+        this.damageBloon(this.bloons.indexOf(target), tower.dynamicDamage, tower.dynamicDamageType, tower.id);
         this.createParticle(target.x, target.y, '#FFFFFF', 8); // Flash effect
         return;
     }
@@ -357,7 +360,7 @@ export class GameEngine {
             this.projectiles.push({
                 id: ++this.projectileIdCounter, x: tower.x, y: tower.y,
                 vx: Math.cos(theta) * tower.dynamicProjectileSpeed * 60, vy: Math.sin(theta) * tower.dynamicProjectileSpeed * 60,
-                damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 40 / 60, damageType: tower.config.damageType,
+                damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 40 / 60, damageType: tower.dynamicDamageType,
                 hitBloons: new Set(), color: tower.config.color, sourceTowerId: tower.id, isExplosive: false
             });
         }
@@ -365,9 +368,9 @@ export class GameEngine {
         this.projectiles.push({
             id: ++this.projectileIdCounter, x: tower.x, y: tower.y,
             vx: Math.cos(angle) * tower.dynamicProjectileSpeed * 60, vy: Math.sin(angle) * tower.dynamicProjectileSpeed * 60,
-            damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 120 / 60, damageType: tower.config.damageType,
+            damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 120 / 60, damageType: tower.dynamicDamageType,
             hitBloons: new Set(), color: tower.config.color, sourceTowerId: tower.id,
-            isExplosive: tower.config.damageType === DamageType.Explosive
+            isExplosive: tower.dynamicDamageType === DamageType.Explosive
         });
     }
   }
