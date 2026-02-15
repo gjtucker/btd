@@ -1,14 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
+import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
 import { CANVAS_HEIGHT, CANVAS_WIDTH, DIFFICULTY_PRESETS, TOWERS } from './constants';
 import { BloonColor, GameDifficulty, TowerConfig, Upgrade } from './types';
-import { Play, RotateCcw, DollarSign, Heart, Trophy, Info, Zap, TrendingUp } from 'lucide-react';
+import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
+
+const MUSIC_ENABLED_STORAGE_KEY = 'btd-music-enabled';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const requestRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
+  const midiRef = useRef<MidiBackgroundMusic | null>(null);
 
   const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.Medium);
   const [money, setMoney] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
@@ -20,6 +24,11 @@ const App: React.FC = () => {
   const [selectedTowerType, setSelectedTowerType] = useState<TowerConfig | null>(null);
   const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number, isFarm: boolean} | null>(null);
   const [roundPreview, setRoundPreview] = useState<string[]>([]);
+  const [isMusicEnabled, setIsMusicEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const savedPreference = window.localStorage.getItem(MUSIC_ENABLED_STORAGE_KEY);
+    return savedPreference !== 'false';
+  });
 
   const updateStats = useCallback(() => {
     if (engineRef.current) {
@@ -55,6 +64,27 @@ const App: React.FC = () => {
   useEffect(() => {
     updateStatsRef.current = updateStats;
   }, [updateStats]);
+
+  useEffect(() => {
+    if (!midiRef.current) {
+      midiRef.current = new MidiBackgroundMusic();
+      midiRef.current.setMuted(!isMusicEnabled);
+    }
+
+    return () => {
+      midiRef.current?.dispose();
+      midiRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    midiRef.current?.setMuted(!isMusicEnabled);
+  }, [isMusicEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(MUSIC_ENABLED_STORAGE_KEY, String(isMusicEnabled));
+  }, [isMusicEnabled]);
 
   useEffect(() => {
     const engine = new GameEngine(() => updateStatsRef.current(), difficulty);
@@ -114,6 +144,7 @@ const App: React.FC = () => {
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!engineRef.current) return;
+    if (isMusicEnabled) midiRef.current?.start();
     const coords = getCanvasCoordinates(e.clientX, e.clientY);
     if (!coords) return;
 
@@ -135,7 +166,7 @@ const App: React.FC = () => {
         syncSelectedTowerStats(null);
       }
     }
-  }, [getCanvasCoordinates, selectedTowerType, syncSelectedTowerStats]);
+  }, [getCanvasCoordinates, isMusicEnabled, selectedTowerType, syncSelectedTowerStats]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!engineRef.current) return;
@@ -144,7 +175,10 @@ const App: React.FC = () => {
     engineRef.current.hoverPos = coords;
   }, [getCanvasCoordinates]);
 
-  const startRound = useCallback(() => engineRef.current?.startRound(), []);
+  const startRound = useCallback(() => {
+    if (isMusicEnabled) midiRef.current?.start();
+    engineRef.current?.startRound();
+  }, [isMusicEnabled]);
   const sellSelectedTower = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } }, [selectedTowerId, syncSelectedTowerStats]);
   const changeStrategy = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
   const buyUpgrade = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
@@ -226,6 +260,23 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-slate-900/70 border border-slate-700 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Music</p>
+              <button
+                onClick={() => {
+                  if (!isMusicEnabled) {
+                    midiRef.current?.start();
+                  }
+                  setIsMusicEnabled((enabled) => !enabled);
+                }}
+                aria-label={isMusicEnabled ? 'Disable background music' : 'Enable background music'}
+                aria-pressed={isMusicEnabled}
+                className={`text-[10px] px-2 py-1 rounded border flex items-center gap-1 uppercase font-bold transition-colors ${isMusicEnabled ? 'border-emerald-500/50 text-emerald-300 bg-emerald-600/10' : 'border-slate-600 text-slate-300 bg-slate-800'}`}
+              >
+                {isMusicEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                {isMusicEnabled ? 'On' : 'Off'}
+              </button>
+            </div>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Next Round Intel</p>
             {roundPreview.length > 0 ? (
               <div className="space-y-1">
