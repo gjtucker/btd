@@ -154,10 +154,16 @@ const App: React.FC = () => {
     if (!containerRef.current) return null;
     const rect = containerRef.current.getBoundingClientRect();
 
-    return {
+    const screenPoint = {
       x: (clientX - rect.left) * (CANVAS_WIDTH / rect.width),
       y: (clientY - rect.top) * (CANVAS_HEIGHT / rect.height),
     };
+
+    if (threeRendererRef.current) {
+      return threeRendererRef.current.screenToWorld(screenPoint.x, screenPoint.y);
+    }
+
+    return screenPoint;
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
