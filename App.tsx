@@ -262,26 +262,31 @@ const App: React.FC = () => {
 
   const towerList = (
     <>
-      <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Monkey Academy</h2>
-      {Object.values(TOWERS).map((tower) => (
-        <button
-          key={tower.id}
-          data-testid={`tower-${tower.id.toLowerCase()}`}
-          onClick={() => { setSelectedTowerType(tower); if(engineRef.current) engineRef.current.selectedTowerPlacement = tower; }}
-          disabled={money < tower.cost}
-          className={`w-full flex items-center p-3 rounded-lg border transition-all duration-200 group ${
-            selectedTowerType?.id === tower.id ? 'bg-blue-600/20 border-blue-500 ring-1 ring-blue-500 shadow-blue-900/40 shadow-inner' : 'bg-slate-700 border-slate-600 hover:bg-slate-600 hover:border-slate-500'
-          } ${money < tower.cost ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800" style={{ backgroundColor: tower.color }}>
-              <span className="text-xs font-bold text-white drop-shadow-md">{tower.id[0]}</span>
-          </div>
-          <div className="ml-3 text-left flex-1">
-            <div className="font-bold text-sm text-slate-100">{tower.name}</div>
-            <div className="text-xs text-yellow-400 font-mono">${tower.cost}</div>
-          </div>
-        </button>
-      ))}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Monkey Academy</h2>
+        <span className="text-[10px] text-slate-400 uppercase tracking-wide">Tap to arm</span>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+        {Object.values(TOWERS).map((tower) => (
+          <button
+            key={tower.id}
+            data-testid={`tower-${tower.id.toLowerCase()}`}
+            onClick={() => { setSelectedTowerType(tower); if(engineRef.current) engineRef.current.selectedTowerPlacement = tower; }}
+            disabled={money < tower.cost}
+            className={`w-full flex items-center p-2.5 rounded-lg border transition-all duration-200 group ${
+              selectedTowerType?.id === tower.id ? 'bg-blue-600/20 border-blue-500 ring-1 ring-blue-500 shadow-blue-900/40 shadow-inner' : 'bg-slate-700 border-slate-600 hover:bg-slate-600 hover:border-slate-500'
+            } ${money < tower.cost ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800" style={{ backgroundColor: tower.color }}>
+                <span className="text-[11px] font-bold text-white drop-shadow-md">{tower.id[0]}</span>
+            </div>
+            <div className="ml-2.5 text-left flex-1 min-w-0">
+              <div className="font-bold text-xs text-slate-100 truncate">{tower.name}</div>
+              <div className="text-[11px] text-yellow-400 font-mono">${tower.cost}</div>
+            </div>
+          </button>
+        ))}
+      </div>
     </>
   );
 
@@ -337,6 +342,76 @@ const App: React.FC = () => {
     </div>
   );
 
+  const intelPanel = (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Difficulty</p>
+        <select
+          value={difficulty}
+          onChange={(event) => selectDifficulty(event.target.value as GameDifficulty)}
+          disabled={isRoundActive}
+          className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-xs font-bold uppercase text-slate-100 disabled:opacity-50"
+        >
+          {Object.values(GameDifficulty).map((mode) => (
+            <option key={mode} value={mode}>{DIFFICULTY_PRESETS[mode].label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Map</p>
+        <select
+          value={mapId}
+          onChange={(event) => selectMap(event.target.value as GameMapId)}
+          disabled={isRoundActive}
+          className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-xs font-bold uppercase text-slate-100 disabled:opacity-50"
+        >
+          {Object.values(MAPS).map((map) => (
+            <option key={map.id} value={map.id}>{map.label}</option>
+          ))}
+        </select>
+        <p className="mt-1 text-[10px] text-slate-500">{MAPS[mapId].description}</p>
+      </div>
+
+      <div className="bg-slate-900/70 border border-slate-700 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest">Music</p>
+          <button
+            onClick={() => {
+              if (!isMusicEnabled) {
+                midiRef.current?.start();
+              }
+              setIsMusicEnabled((enabled) => !enabled);
+            }}
+            aria-label={isMusicEnabled ? 'Disable background music' : 'Enable background music'}
+            aria-pressed={isMusicEnabled}
+            className={`text-[10px] px-2 py-1 rounded border flex items-center gap-1 uppercase font-bold transition-colors ${isMusicEnabled ? 'border-emerald-500/50 text-emerald-300 bg-emerald-600/10' : 'border-slate-600 text-slate-300 bg-slate-800'}`}
+          >
+            {isMusicEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+            {isMusicEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Next Round Intel</p>
+        {roundPreview.length > 0 ? (
+          <div className="space-y-1">
+            {roundPreview.map((entry) => {
+              const [countPart, typePart] = entry.split('x ');
+              const bloonType = typePart as BloonColor;
+              return (
+                <div key={entry} className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-300">{countPart.trim()} bloons</span>
+                  <span className={`px-2 py-0.5 rounded font-bold ${bloonBadgeColor[bloonType]}`}>{bloonType}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-500">No more scripted rounds.</p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen w-screen flex-col-reverse lg:h-screen lg:flex-row bg-slate-900 text-white overflow-y-auto lg:overflow-hidden font-sans">
       <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-none lg:max-h-none">
@@ -361,87 +436,7 @@ const App: React.FC = () => {
         </div>
 
 
-        <div className="px-3 lg:px-4 pb-3 lg:pb-4 border-b border-slate-700 space-y-3">
-          <div>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Difficulty</p>
-            <div className="grid grid-cols-3 gap-2">
-              {Object.values(GameDifficulty).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => selectDifficulty(mode)}
-                  disabled={isRoundActive}
-                  className={`text-[10px] py-2 rounded border transition-colors font-bold uppercase ${
-                    difficulty === mode
-                      ? 'bg-blue-600 border-blue-400 text-white'
-                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  } ${isRoundActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {DIFFICULTY_PRESETS[mode].label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Map</p>
-            <div className="space-y-2">
-              {Object.values(MAPS).map((map) => (
-                <button
-                  key={map.id}
-                  onClick={() => selectMap(map.id)}
-                  disabled={isRoundActive}
-                  className={`w-full text-left rounded border p-2 transition-colors ${
-                    mapId === map.id
-                      ? 'bg-emerald-600/20 border-emerald-400 text-emerald-100'
-                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  } ${isRoundActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className="text-xs font-bold uppercase tracking-wide">{map.label}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{map.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-slate-900/70 border border-slate-700 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Music</p>
-              <button
-                onClick={() => {
-                  if (!isMusicEnabled) {
-                    midiRef.current?.start();
-                  }
-                  setIsMusicEnabled((enabled) => !enabled);
-                }}
-                aria-label={isMusicEnabled ? 'Disable background music' : 'Enable background music'}
-                aria-pressed={isMusicEnabled}
-                className={`text-[10px] px-2 py-1 rounded border flex items-center gap-1 uppercase font-bold transition-colors ${isMusicEnabled ? 'border-emerald-500/50 text-emerald-300 bg-emerald-600/10' : 'border-slate-600 text-slate-300 bg-slate-800'}`}
-              >
-                {isMusicEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-                {isMusicEnabled ? 'On' : 'Off'}
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Next Round Intel</p>
-            {roundPreview.length > 0 ? (
-              <div className="space-y-1">
-                {roundPreview.map((entry) => {
-                  const [countPart, typePart] = entry.split('x ');
-                  const bloonType = typePart as BloonColor;
-                  return (
-                    <div key={entry} className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-300">{countPart.trim()} bloons</span>
-                      <span className={`px-2 py-0.5 rounded font-bold ${bloonBadgeColor[bloonType]}`}>{bloonType}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-500">No more scripted rounds.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:hidden px-3 py-2 border-b border-slate-700 bg-slate-900/60">
+        <div className="px-3 py-2 border-b border-slate-700 bg-slate-900/60">
           <div className="grid grid-cols-3 gap-2">
             {([
               { id: 'build', label: 'Build' },
@@ -459,27 +454,15 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="hidden lg:block flex-1 overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 scrollbar-hide">
-          {towerList}
-        </div>
-
-        <div className="lg:hidden max-h-[40vh] overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 scrollbar-hide">
           {mobilePanel === 'build' && <div className="space-y-2">{towerList}</div>}
-          {mobilePanel === 'intel' && (
-            <p className="text-xs text-slate-300 bg-slate-900/70 border border-slate-700 rounded-lg p-3">
-              Difficulty, music controls, and next-round intel are shown above. Use this space for quick status checks while keeping scroll targets larger on small screens.
-            </p>
-          )}
+          {mobilePanel === 'intel' && intelPanel}
           {mobilePanel === 'tower' && (
             selectedTowerCard ?? <p className="text-xs text-slate-400 bg-slate-900/70 border border-slate-700 rounded-lg p-3">Select a placed tower to manage upgrades and targeting here.</p>
           )}
         </div>
 
-        <div className="hidden lg:block">
-          {selectedTowerCard}
-        </div>
 
-        
         <div className="p-3 lg:p-4 border-t border-slate-700 bg-slate-900">
           {!isGameOver ? (
             <button
