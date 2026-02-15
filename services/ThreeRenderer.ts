@@ -9,6 +9,8 @@ export class ThreeRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private currentMap: GameMap | null = null;
+  private readonly horizon = 82;
+  private readonly tilt = 0.62;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -43,33 +45,52 @@ export class ThreeRenderer {
     this.currentMap = map;
   }
 
-  private project(x: number, y: number, height = 0): GroundPoint {
-    const horizon = 80;
-    const tilt = 0.62;
-    const screenY = y * tilt + horizon - height;
+  public worldToScreen(x: number, y: number, height = 0): GroundPoint {
+    const screenY = y * this.tilt + this.horizon - height;
     return { x, y: screenY };
+  }
+
+  public screenToWorld(x: number, y: number, height = 0): GroundPoint {
+    const worldY = (y - this.horizon + height) / this.tilt;
+    return { x, y: worldY };
   }
 
   private drawMap(map: GameMap) {
     this.ctx.fillStyle = map.theme.terrainEnd;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    const top = this.project(0, 0).y;
-    const bottom = this.project(0, CANVAS_HEIGHT).y;
+    const top = this.worldToScreen(0, 0).y;
+    const bottom = this.worldToScreen(0, CANVAS_HEIGHT).y;
+
+    const skyGradient = this.ctx.createLinearGradient(0, 0, 0, top + 40);
+    skyGradient.addColorStop(0, '#0b1220');
+    skyGradient.addColorStop(1, '#172033');
+    this.ctx.fillStyle = skyGradient;
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, top + 50);
+
     const gradient = this.ctx.createLinearGradient(0, top, 0, bottom);
     gradient.addColorStop(0, map.theme.terrainStart);
-    gradient.addColorStop(0.45, map.theme.terrainMid);
+    gradient.addColorStop(0.35, map.theme.terrainMid);
     gradient.addColorStop(1, map.theme.terrainEnd);
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, top, CANVAS_WIDTH, bottom - top);
 
-    const projectedNodes = map.nodes.map((node) => this.project(node.x, node.y));
+    const projectedNodes = map.nodes.map((node) => this.worldToScreen(node.x, node.y));
+
+    this.ctx.strokeStyle = '#ffffff14';
+    this.ctx.lineWidth = 1;
+    for (let y = top + 12; y < bottom; y += 28) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, y);
+      this.ctx.lineTo(CANVAS_WIDTH, y);
+      this.ctx.stroke();
+    }
 
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
 
-    this.ctx.strokeStyle = '#00000055';
-    this.ctx.lineWidth = 50;
+    this.ctx.strokeStyle = '#00000066';
+    this.ctx.lineWidth = 54;
     this.ctx.beginPath();
     this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y + 6);
     for (let i = 1; i < projectedNodes.length; i++) {
@@ -78,7 +99,7 @@ export class ThreeRenderer {
     this.ctx.stroke();
 
     this.ctx.strokeStyle = map.theme.pathBorder;
-    this.ctx.lineWidth = 42;
+    this.ctx.lineWidth = 44;
     this.ctx.beginPath();
     this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y);
     for (let i = 1; i < projectedNodes.length; i++) {
@@ -87,19 +108,34 @@ export class ThreeRenderer {
     this.ctx.stroke();
 
     this.ctx.strokeStyle = map.theme.pathStart;
-    this.ctx.lineWidth = 22;
+    this.ctx.lineWidth = 24;
     this.ctx.beginPath();
     this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y - 1);
     for (let i = 1; i < projectedNodes.length; i++) {
       this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y - 1);
     }
     this.ctx.stroke();
+
+    this.ctx.strokeStyle = '#ffffff30';
+    this.ctx.lineWidth = 5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y - 4);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y - 4);
+    }
+    this.ctx.stroke();
+
+    const vignette = this.ctx.createRadialGradient(CANVAS_WIDTH / 2, top + 220, 260, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_HEIGHT);
+    vignette.addColorStop(0, '#00000000');
+    vignette.addColorStop(1, '#00000077');
+    this.ctx.fillStyle = vignette;
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   private drawPlacementRange(engine: GameEngine) {
     if (!engine.selectedTowerPlacement || !engine.hoverPos) return;
 
-    const center = this.project(engine.hoverPos.x, engine.hoverPos.y);
+    const center = this.worldToScreen(engine.hoverPos.x, engine.hoverPos.y);
 
     this.ctx.strokeStyle = '#ffffffbb';
     this.ctx.lineWidth = 2;
@@ -120,7 +156,7 @@ export class ThreeRenderer {
     const tower = engine.towers.find((candidate) => candidate.id === engine.selectedTowerId);
     if (!tower) return;
 
-    const center = this.project(tower.x, tower.y);
+    const center = this.worldToScreen(tower.x, tower.y);
     this.ctx.strokeStyle = '#ffffffaa';
     this.ctx.lineWidth = 2;
     this.ctx.beginPath();
@@ -129,22 +165,33 @@ export class ThreeRenderer {
   }
 
   private drawTower(x: number, y: number, color: string) {
-    const base = this.project(x, y);
+    const base = this.worldToScreen(x, y);
 
     this.ctx.fillStyle = '#00000055';
     this.ctx.beginPath();
     this.ctx.ellipse(base.x + 5, base.y + 8, 26, 14, 0, 0, Math.PI * 2);
     this.ctx.fill();
 
-    this.ctx.fillStyle = '#1e293b';
+    this.ctx.fillStyle = '#0f172a';
     this.ctx.beginPath();
     this.ctx.ellipse(base.x, base.y - 8, 24, 11, 0, 0, Math.PI * 2);
     this.ctx.fill();
 
+    this.ctx.fillStyle = '#e2e8f0';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x, base.y - 20, 13, 14, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
-    this.ctx.ellipse(base.x, base.y - 28, 18, 14, 0, 0, Math.PI * 2);
+    this.ctx.ellipse(base.x, base.y - 30, 18, 14, 0, 0, Math.PI * 2);
     this.ctx.fill();
+
+    this.ctx.strokeStyle = '#ffffff55';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x - 4, base.y - 34, 6, 4, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
 
     this.ctx.fillStyle = '#0f172a';
     this.ctx.beginPath();
@@ -154,12 +201,17 @@ export class ThreeRenderer {
 
   private drawBloon(x: number, y: number, type: string) {
     const stats = BLOON_STATS[type as keyof typeof BLOON_STATS];
-    const body = this.project(x, y, 20);
-    const shadow = this.project(x, y);
+    const body = this.worldToScreen(x, y, 20);
+    const shadow = this.worldToScreen(x, y);
 
     this.ctx.fillStyle = '#00000066';
     this.ctx.beginPath();
     this.ctx.ellipse(shadow.x + 4, shadow.y + 5, stats.r, stats.r * 0.45, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#ffffff55';
+    this.ctx.beginPath();
+    this.ctx.ellipse(body.x - stats.r * 0.25, body.y - stats.r * 0.4, stats.r * 0.22, stats.r * 0.14, 0, 0, Math.PI * 2);
     this.ctx.fill();
 
     this.ctx.fillStyle = this.getBloonColor(type);
@@ -183,7 +235,7 @@ export class ThreeRenderer {
   }
 
   private drawProjectile(x: number, y: number, color: string, explosive: boolean) {
-    const p = this.project(x, y, explosive ? 14 : 20);
+    const p = this.worldToScreen(x, y, explosive ? 14 : 20);
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
     this.ctx.ellipse(p.x, p.y, explosive ? 7 : 4, explosive ? 5 : 3, 0, 0, Math.PI * 2);
@@ -191,7 +243,7 @@ export class ThreeRenderer {
   }
 
   private drawParticle(x: number, y: number, size: number, color: string, alpha: number) {
-    const p = this.project(x, y, 18);
+    const p = this.worldToScreen(x, y, 18);
     this.ctx.globalAlpha = alpha;
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
