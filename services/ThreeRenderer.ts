@@ -1,418 +1,247 @@
-import * as THREE from 'three';
 import { GameEngine } from './GameEngine';
-import { GameMap, Point } from '../types';
 import { BLOON_STATS, CANVAS_HEIGHT, CANVAS_WIDTH } from '../constants';
+import { GameMap } from '../types';
+
+type GroundPoint = { x: number; y: number };
 
 export class ThreeRenderer {
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
   private container: HTMLElement;
-
-  private bloonMeshes: Map<number, THREE.Group> = new Map();
-  private towerMeshes: Map<number, THREE.Group> = new Map();
-  private projectileMeshes: Map<number, THREE.Mesh> = new Map();
-  private particlePool: THREE.Mesh[] = [];
-  private activeParticles: THREE.Group;
-  private particleGeo: THREE.SphereGeometry = new THREE.SphereGeometry(1, 4, 4);
-
-  private ground: THREE.Mesh | null = null;
-  private pathMesh: THREE.Group | null = null;
-
-  private rangeCircle: THREE.LineLoop | null = null;
-  private ghostTower: THREE.Group | null = null;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private currentMap: GameMap | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0a0a);
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = CANVAS_WIDTH;
+    this.canvas.height = CANVAS_HEIGHT;
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = 'auto';
+    this.canvas.style.display = 'block';
 
-    this.camera = new THREE.PerspectiveCamera(
-      50,
-      CANVAS_WIDTH / CANVAS_HEIGHT,
-      0.1,
-      3000
-    );
-    // Position camera at an overhead angle to see the whole 800x600 area
-    this.camera.position.set(0, 800, 600);
-    this.camera.lookAt(0, 0, 0);
+    const context = this.canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Failed to initialize renderer canvas');
+    }
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(this.renderer.domElement);
-
-    this.activeParticles = new THREE.Group();
-    this.scene.add(this.activeParticles);
-
-    this.initLighting();
-  }
-
-  private initLighting() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(200, 500, 100);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.left = -500;
-    directionalLight.shadow.camera.right = 500;
-    directionalLight.shadow.camera.top = 500;
-    directionalLight.shadow.camera.bottom = -500;
-    this.scene.add(directionalLight);
+    this.ctx = context;
+    this.container.appendChild(this.canvas);
   }
 
   public resize(width: number, height: number) {
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
+    this.canvas.width = width;
+    this.canvas.height = height;
   }
 
   public dispose() {
-    if (this.container.contains(this.renderer.domElement)) {
-        this.container.removeChild(this.renderer.domElement);
+    if (this.container.contains(this.canvas)) {
+      this.container.removeChild(this.canvas);
     }
-    this.renderer.dispose();
-    this.disposeObject(this.scene);
-    this.particleGeo.dispose();
-    this.particlePool.forEach(p => {
-        p.geometry.dispose();
-        if (p.material instanceof THREE.Material) p.material.dispose();
-    });
-  }
-
-  private to3D(x: number, y: number): THREE.Vector3 {
-    // Map (0, 800) x (0, 600) to (-400, 400) x (-300, 300)
-    // Z is 0 on the plane, we use Y for vertical if needed but mostly Z is for depth in Three.js default but here we use XZ plane
-    return new THREE.Vector3(x - CANVAS_WIDTH / 2, 0, y - CANVAS_HEIGHT / 2);
   }
 
   public initScene(map: GameMap) {
-    // Clear existing environment
-    if (this.ground) {
-        this.disposeObject(this.ground);
-        this.scene.remove(this.ground);
-    }
-    if (this.pathMesh) {
-        this.disposeObject(this.pathMesh);
-        this.scene.remove(this.pathMesh);
-    }
-
-    // Create ground
-    const groundGeo = new THREE.PlaneGeometry(CANVAS_WIDTH, CANVAS_HEIGHT);
-    const groundMat = new THREE.MeshStandardMaterial({ color: map.theme.terrainMid });
-    this.ground = new THREE.Mesh(groundGeo, groundMat);
-    this.ground.rotation.x = -Math.PI / 2;
-    this.ground.receiveShadow = true;
-    this.scene.add(this.ground);
-
-    // Create path
-    this.pathMesh = new THREE.Group();
-    const pathMat = new THREE.MeshStandardMaterial({ color: map.theme.pathMid });
-
-    for (let i = 0; i < map.nodes.length - 1; i++) {
-        const start = map.nodes[i];
-        const end = map.nodes[i + 1];
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const length = Math.sqrt(dx * dx + dy * dy) + 40; // Add width to length to cover corners
-        const angle = Math.atan2(dy, dx);
-
-        const segmentGeo = new THREE.PlaneGeometry(length, 40);
-        const segment = new THREE.Mesh(segmentGeo, pathMat);
-
-        const centerPos = this.to3D((start.x + end.x) / 2, (start.y + end.y) / 2);
-        segment.position.set(centerPos.x, 0.1, centerPos.z); // Slightly above ground
-        segment.rotation.x = -Math.PI / 2;
-        segment.rotation.z = angle;
-        segment.receiveShadow = true;
-        this.pathMesh.add(segment);
-
-        // Add a "joint" at each node to smooth corners
-        const jointGeo = new THREE.CircleGeometry(20, 16);
-        const joint = new THREE.Mesh(jointGeo, pathMat);
-        const jointPos = this.to3D(start.x, start.y);
-        joint.position.set(jointPos.x, 0.11, jointPos.z);
-        joint.rotation.x = -Math.PI / 2;
-        this.pathMesh.add(joint);
-
-        if (i === map.nodes.length - 2) {
-            const endJoint = new THREE.Mesh(jointGeo, pathMat);
-            const endJointPos = this.to3D(end.x, end.y);
-            endJoint.position.set(endJointPos.x, 0.11, endJointPos.z);
-            endJoint.rotation.x = -Math.PI / 2;
-            this.pathMesh.add(endJoint);
-        }
-    }
-
-    this.scene.add(this.pathMesh);
+    this.currentMap = map;
   }
 
-  private getBloonColor(type: string): number {
+  private project(x: number, y: number, height = 0): GroundPoint {
+    const horizon = 80;
+    const tilt = 0.62;
+    const screenY = y * tilt + horizon - height;
+    return { x, y: screenY };
+  }
+
+  private drawMap(map: GameMap) {
+    this.ctx.fillStyle = map.theme.terrainDark;
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const top = this.project(0, 0).y;
+    const bottom = this.project(0, CANVAS_HEIGHT).y;
+    const gradient = this.ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, map.theme.terrainLight);
+    gradient.addColorStop(0.45, map.theme.terrainMid);
+    gradient.addColorStop(1, map.theme.terrainDark);
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(0, top, CANVAS_WIDTH, bottom - top);
+
+    const projectedNodes = map.nodes.map((node) => this.project(node.x, node.y));
+
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+
+    this.ctx.strokeStyle = '#00000055';
+    this.ctx.lineWidth = 50;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y + 6);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y + 6);
+    }
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = map.theme.pathDark;
+    this.ctx.lineWidth = 42;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y);
+    }
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = map.theme.pathLight;
+    this.ctx.lineWidth = 22;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y - 1);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y - 1);
+    }
+    this.ctx.stroke();
+  }
+
+  private drawPlacementRange(engine: GameEngine) {
+    if (!engine.selectedTowerPlacement || !engine.hoverPos) return;
+
+    const center = this.project(engine.hoverPos.x, engine.hoverPos.y);
+
+    this.ctx.strokeStyle = '#ffffffbb';
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([6, 6]);
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y, engine.selectedTowerPlacement.range, engine.selectedTowerPlacement.range * 0.62, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+
+    this.ctx.fillStyle = `${engine.selectedTowerPlacement.color}88`;
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y - 10, 18, 10, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
+  private drawSelectionRange(engine: GameEngine) {
+    if (!engine.selectedTowerId) return;
+    const tower = engine.towers.find((candidate) => candidate.id === engine.selectedTowerId);
+    if (!tower) return;
+
+    const center = this.project(tower.x, tower.y);
+    this.ctx.strokeStyle = '#ffffffaa';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y, tower.dynamicRange, tower.dynamicRange * 0.62, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+  }
+
+  private drawTower(x: number, y: number, color: string) {
+    const base = this.project(x, y);
+
+    this.ctx.fillStyle = '#00000055';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x + 5, base.y + 8, 26, 14, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x, base.y - 8, 24, 11, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x, base.y - 28, 18, 14, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x + 8, base.y - 36, 6, 5, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
+  private drawBloon(x: number, y: number, type: string) {
+    const stats = BLOON_STATS[type as keyof typeof BLOON_STATS];
+    const body = this.project(x, y, 20);
+    const shadow = this.project(x, y);
+
+    this.ctx.fillStyle = '#00000066';
+    this.ctx.beginPath();
+    this.ctx.ellipse(shadow.x + 4, shadow.y + 5, stats.r, stats.r * 0.45, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = this.getBloonColor(type);
+    this.ctx.beginPath();
+    if (type === 'MOAB') {
+      this.ctx.ellipse(body.x, body.y, stats.r * 1.8, stats.r * 0.9, 0, 0, Math.PI * 2);
+    } else {
+      this.ctx.ellipse(body.x, body.y, stats.r * 0.95, stats.r * 1.25, 0, 0, Math.PI * 2);
+    }
+    this.ctx.fill();
+
+    if (type !== 'MOAB') {
+      this.ctx.fillStyle = '#111827';
+      this.ctx.beginPath();
+      this.ctx.moveTo(body.x - 3, body.y + stats.r * 0.95);
+      this.ctx.lineTo(body.x, body.y + stats.r + 9);
+      this.ctx.lineTo(body.x + 3, body.y + stats.r * 0.95);
+      this.ctx.closePath();
+      this.ctx.fill();
+    }
+  }
+
+  private drawProjectile(x: number, y: number, color: string, explosive: boolean) {
+    const p = this.project(x, y, explosive ? 14 : 20);
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.ellipse(p.x, p.y, explosive ? 7 : 4, explosive ? 5 : 3, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
+  private drawParticle(x: number, y: number, size: number, color: string, alpha: number) {
+    const p = this.project(x, y, 18);
+    this.ctx.globalAlpha = alpha;
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.globalAlpha = 1;
+  }
+
+  private getBloonColor(type: string): string {
     switch (type) {
-      case 'Red': return 0xef4444;
-      case 'Blue': return 0x3b82f6;
-      case 'Green': return 0x22c55e;
-      case 'Yellow': return 0xeab308;
-      case 'Pink': return 0xec4899;
-      case 'Black': return 0x1f2937;
-      case 'White': return 0xf3f4f6;
-      case 'Lead': return 0x6b7280;
-      case 'Zebra': return 0x111827;
-      case 'Rainbow': return 0x6366f1;
-      case 'Ceramic': return 0xfdba74;
-      case 'MOAB': return 0x3b82f6;
-      default: return 0xef4444;
-    }
-  }
-
-  private disposeObject(obj: THREE.Object3D) {
-    obj.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach(m => m.dispose());
-        } else {
-          child.material.dispose();
-        }
-      }
-    });
-  }
-
-  private syncBloons(engine: GameEngine) {
-    const currentIds = new Set(engine.bloons.map(b => b.id));
-
-    // Remove old bloons
-    for (const [id, mesh] of this.bloonMeshes.entries()) {
-      if (!currentIds.has(id)) {
-        this.scene.remove(mesh);
-        this.disposeObject(mesh);
-        this.bloonMeshes.delete(id);
-      }
-    }
-
-    // Add or update bloons
-    engine.bloons.forEach(b => {
-      let group = this.bloonMeshes.get(b.id);
-      const stats = BLOON_STATS[b.type];
-
-      if (!group) {
-        group = new THREE.Group();
-
-        const color = this.getBloonColor(b.type);
-        const bodyGeo = b.type === 'MOAB'
-            ? new THREE.SphereGeometry(stats.r, 32, 16)
-            : new THREE.SphereGeometry(stats.r, 16, 12);
-
-        const bodyMat = new THREE.MeshStandardMaterial({ color });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-
-        if (b.type === 'MOAB') {
-            body.scale.set(1.5, 1, 1);
-        } else {
-            body.scale.set(0.85, 1.1, 0.85);
-
-            // Knot
-            const knotGeo = new THREE.ConeGeometry(3, 6, 8);
-            const knot = new THREE.Mesh(knotGeo, bodyMat);
-            knot.position.y = -stats.r;
-            knot.rotation.x = Math.PI;
-            group.add(knot);
-        }
-
-        body.castShadow = true;
-        group.add(body);
-        this.scene.add(group);
-        this.bloonMeshes.set(b.id, group);
-      }
-
-      const pos = this.to3D(b.x, b.y);
-      group.position.set(pos.x, stats.r + 5, pos.z);
-
-      if (b.type === 'MOAB') {
-          const targetNode = engine.getMap().nodes[b.nodeIndex + 1];
-          if (targetNode) {
-              const dx = targetNode.x - b.x;
-              const dy = targetNode.y - b.y;
-              group.rotation.y = -Math.atan2(dy, dx);
-          }
-      }
-    });
-  }
-
-  private syncTowers(engine: GameEngine) {
-    const currentIds = new Set(engine.towers.map(t => t.id));
-
-    // Remove old towers
-    for (const [id, mesh] of this.towerMeshes.entries()) {
-      if (!currentIds.has(id)) {
-        this.scene.remove(mesh);
-        this.disposeObject(mesh);
-        this.towerMeshes.delete(id);
-      }
-    }
-
-    // Add or update towers
-    engine.towers.forEach(t => {
-      let group = this.towerMeshes.get(t.id);
-
-      if (!group) {
-        group = new THREE.Group();
-
-        // Base
-        const baseGeo = new THREE.CylinderGeometry(24, 24, 10, 16);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
-        const base = new THREE.Mesh(baseGeo, baseMat);
-        base.position.y = 5;
-        base.receiveShadow = true;
-        group.add(base);
-
-        // Body
-        const bodyGeo = new THREE.CylinderGeometry(20, 20, 30, 16);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: t.config.color });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 25;
-        body.castShadow = true;
-        group.add(body);
-
-        // Head
-        const headGeo = new THREE.SphereGeometry(15, 12, 12);
-        const head = new THREE.Mesh(headGeo, bodyMat);
-        head.position.y = 45;
-        head.castShadow = true;
-        group.add(head);
-
-        this.scene.add(group);
-        this.towerMeshes.set(t.id, group);
-      }
-
-      const pos = this.to3D(t.x, t.y);
-      group.position.set(pos.x, 0, pos.z);
-    });
-  }
-
-  private syncProjectiles(engine: GameEngine) {
-    const currentIds = new Set(engine.projectiles.map(p => p.id));
-
-    for (const [id, mesh] of this.projectileMeshes.entries()) {
-      if (!currentIds.has(id)) {
-        this.scene.remove(mesh);
-        this.disposeObject(mesh);
-        this.projectileMeshes.delete(id);
-      }
-    }
-
-    engine.projectiles.forEach(p => {
-      let mesh = this.projectileMeshes.get(p.id);
-
-      if (!mesh) {
-        const geo = p.damageType === 'Explosive'
-            ? new THREE.SphereGeometry(6, 8, 8)
-            : new THREE.BoxGeometry(4, 4, 12);
-        const mat = new THREE.MeshStandardMaterial({ color: p.color });
-        mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = true;
-        this.scene.add(mesh);
-        this.projectileMeshes.set(p.id, mesh);
-      }
-
-      const pos = this.to3D(p.x, p.y);
-      mesh.position.set(pos.x, 25, pos.z);
-
-      if (p.damageType !== 'Explosive') {
-          mesh.rotation.y = -Math.atan2(p.vy, p.vx);
-      }
-    });
-  }
-
-  private syncParticles(engine: GameEngine) {
-    // Return all active particles to pool
-    while(this.activeParticles.children.length > 0) {
-        const child = this.activeParticles.children[0] as THREE.Mesh;
-        this.activeParticles.remove(child);
-        this.particlePool.push(child);
-    }
-
-    engine.particles.forEach(p => {
-        let mesh = this.particlePool.pop();
-        if (!mesh) {
-            const mat = new THREE.MeshBasicMaterial({ transparent: true });
-            mesh = new THREE.Mesh(this.particleGeo, mat);
-        }
-
-        const mat = mesh.material as THREE.MeshBasicMaterial;
-        mat.color.set(p.color);
-        mat.opacity = p.life / p.maxLife;
-
-        const pos = this.to3D(p.x, p.y);
-        mesh.position.set(pos.x, 25, pos.z);
-        mesh.scale.set(p.size, p.size, p.size);
-        this.activeParticles.add(mesh);
-    });
-  }
-
-  private syncUI(engine: GameEngine) {
-    // Range Circle
-    let rangeTowerPos: THREE.Vector3 | null = null;
-    let range: number = 0;
-
-    if (engine.selectedTowerPlacement && engine.hoverPos) {
-        rangeTowerPos = this.to3D(engine.hoverPos.x, engine.hoverPos.y);
-        range = engine.selectedTowerPlacement.range;
-
-        // Ghost Tower
-        if (!this.ghostTower) {
-            this.ghostTower = new THREE.Group();
-            const geo = new THREE.CylinderGeometry(20, 20, 30, 16);
-            const mat = new THREE.MeshStandardMaterial({ color: engine.selectedTowerPlacement.color, transparent: true, opacity: 0.5 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.y = 15;
-            this.ghostTower.add(mesh);
-            this.scene.add(this.ghostTower);
-        }
-        this.ghostTower.position.set(rangeTowerPos.x, 0, rangeTowerPos.z);
-        this.ghostTower.visible = true;
-    } else {
-        if (this.ghostTower) this.ghostTower.visible = false;
-    }
-
-    if (engine.selectedTowerId) {
-        const t = engine.towers.find(tw => tw.id === engine.selectedTowerId);
-        if (t) {
-            rangeTowerPos = this.to3D(t.x, t.y);
-            range = t.dynamicRange;
-        }
-    }
-
-    if (rangeTowerPos && range > 0) {
-        if (!this.rangeCircle) {
-            const points = [];
-            for (let i = 0; i <= 64; i++) {
-                const theta = (i / 64) * Math.PI * 2;
-                points.push(new THREE.Vector3(Math.cos(theta), 0, Math.sin(theta)));
-            }
-            const geo = new THREE.BufferGeometry().setFromPoints(points);
-            const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-            this.rangeCircle = new THREE.LineLoop(geo, mat);
-            this.scene.add(this.rangeCircle);
-        }
-        this.rangeCircle.position.set(rangeTowerPos.x, 0.2, rangeTowerPos.z);
-        this.rangeCircle.scale.set(range, 1, range);
-        this.rangeCircle.visible = true;
-    } else {
-        if (this.rangeCircle) this.rangeCircle.visible = false;
+      case 'Blue': return '#3b82f6';
+      case 'Green': return '#22c55e';
+      case 'Yellow': return '#eab308';
+      case 'Pink': return '#ec4899';
+      case 'Black': return '#1f2937';
+      case 'White': return '#f3f4f6';
+      case 'Lead': return '#6b7280';
+      case 'Zebra': return '#111827';
+      case 'Rainbow': return '#6366f1';
+      case 'Ceramic': return '#fdba74';
+      case 'MOAB': return '#3b82f6';
+      default: return '#ef4444';
     }
   }
 
   public render(engine: GameEngine) {
-    this.syncBloons(engine);
-    this.syncTowers(engine);
-    this.syncProjectiles(engine);
-    this.syncParticles(engine);
-    this.syncUI(engine);
-    this.renderer.render(this.scene, this.camera);
+    const map = this.currentMap ?? engine.getMap();
+    this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    this.drawMap(map);
+    this.drawPlacementRange(engine);
+    this.drawSelectionRange(engine);
+
+    const drawQueue: Array<{ depth: number; draw: () => void }> = [];
+
+    engine.towers.forEach((tower) => {
+      drawQueue.push({ depth: tower.y, draw: () => this.drawTower(tower.x, tower.y, tower.config.color) });
+    });
+
+    engine.bloons.forEach((bloon) => {
+      drawQueue.push({ depth: bloon.y, draw: () => this.drawBloon(bloon.x, bloon.y, bloon.type) });
+    });
+
+    engine.projectiles.forEach((projectile) => {
+      drawQueue.push({ depth: projectile.y, draw: () => this.drawProjectile(projectile.x, projectile.y, projectile.color, projectile.damageType === 'Explosive') });
+    });
+
+    drawQueue.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
+
+    engine.particles.forEach((particle) => {
+      this.drawParticle(particle.x, particle.y, particle.size, particle.color, Math.max(0, particle.life / particle.maxLife));
+    });
   }
 }
