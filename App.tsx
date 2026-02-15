@@ -260,6 +260,7 @@ const App: React.FC = () => {
       {Object.values(TOWERS).map((tower) => (
         <button
           key={tower.id}
+          data-testid={`tower-${tower.id.toLowerCase()}`}
           onClick={() => { setSelectedTowerType(tower); if(engineRef.current) engineRef.current.selectedTowerPlacement = tower; }}
           disabled={money < tower.cost}
           className={`w-full flex items-center p-3 rounded-lg border transition-all duration-200 group ${
@@ -342,13 +343,13 @@ const App: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-3 p-3 lg:gap-4 lg:p-4 border-b border-slate-700 bg-slate-800/50">
            <div className="flex items-center gap-2 text-green-400 font-mono text-lg font-bold">
-              <DollarSign className="w-5 h-5" /> {Math.floor(money)}
+              <DollarSign className="w-5 h-5" /> <span data-testid="money">{Math.floor(money)}</span>
            </div>
            <div className="flex items-center gap-2 text-red-400 font-mono text-lg font-bold">
-              <Heart className="w-5 h-5" /> {lives}
+              <Heart className="w-5 h-5" /> <span data-testid="lives">{lives}</span>
            </div>
            <div className="col-span-2 flex items-center justify-between text-blue-300 font-mono text-sm bg-slate-900 p-2 rounded">
-              <span>Round {round}</span>
+              <span data-testid="round">Round {round}</span>
               {isRoundActive ? <span className="text-yellow-400 animate-pulse text-xs uppercase font-bold">Active</span> : <span className="text-slate-500 text-xs uppercase font-bold">Ready</span>}
            </div>
         </div>
@@ -478,6 +479,7 @@ const App: React.FC = () => {
             <button
               onClick={startRound}
               disabled={isRoundActive}
+              data-testid="start-round"
               className={`w-full py-4 rounded-xl font-black text-lg shadow-2xl flex items-center justify-center gap-2 transition-all transform active:scale-95 uppercase tracking-wider ${
                 isRoundActive ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white shadow-green-900/40 ring-2 ring-green-400/20'
               }`}
@@ -502,6 +504,7 @@ const App: React.FC = () => {
             )}
             <div
               ref={containerRef}
+              data-testid="game-canvas"
               style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
