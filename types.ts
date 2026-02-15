@@ -7,6 +7,8 @@ export enum BloonColor {
   Pink = 'Pink',
   Black = 'Black',
   White = 'White',
+  Lead = 'Lead',
+  Zebra = 'Zebra',
 }
 
 export enum DamageType {
@@ -27,6 +29,7 @@ export interface BloonLayer {
   immunities: DamageType[];
   r: number;
   money: number;
+  leakLives: number;
 }
 
 export interface Upgrade {
@@ -54,6 +57,23 @@ export interface TowerConfig {
   damageType: DamageType;
   color: string;
   upgrades: Upgrade[];
+}
+
+
+export enum GameDifficulty {
+  Easy = 'EASY',
+  Medium = 'MEDIUM',
+  Hard = 'HARD',
+}
+
+export interface DifficultyPreset {
+  id: GameDifficulty;
+  label: string;
+  startingMoney: number;
+  startingLives: number;
+  roundBonusBase: number;
+  roundBonusScale: number;
+  sellbackRate: number;
 }
 
 export enum TargetStrategy {

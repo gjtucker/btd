@@ -1,7 +1,38 @@
-import { BloonColor, BloonLayer, DamageType, Point, TowerConfig, Wave } from './types';
+import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, Point, TowerConfig, Wave } from './types';
 
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
+
+
+export const DIFFICULTY_PRESETS: Record<GameDifficulty, DifficultyPreset> = {
+  [GameDifficulty.Easy]: {
+    id: GameDifficulty.Easy,
+    label: 'Easy',
+    startingMoney: 750,
+    startingLives: 200,
+    roundBonusBase: 120,
+    roundBonusScale: 1,
+    sellbackRate: 0.75,
+  },
+  [GameDifficulty.Medium]: {
+    id: GameDifficulty.Medium,
+    label: 'Medium',
+    startingMoney: 650,
+    startingLives: 100,
+    roundBonusBase: 100,
+    roundBonusScale: 1,
+    sellbackRate: 0.7,
+  },
+  [GameDifficulty.Hard]: {
+    id: GameDifficulty.Hard,
+    label: 'Hard',
+    startingMoney: 500,
+    startingLives: 75,
+    roundBonusBase: 80,
+    roundBonusScale: 0.9,
+    sellbackRate: 0.65,
+  },
+};
 
 export const PATH_NODES: Point[] = [
   { x: 0, y: 100 },
@@ -15,13 +46,15 @@ export const PATH_NODES: Point[] = [
 ];
 
 export const BLOON_STATS: Record<BloonColor, BloonLayer> = {
-  [BloonColor.Red]: { color: BloonColor.Red, health: 1, speed: 1.5, children: [], childCount: 0, immunities: [], r: 15, money: 1 },
-  [BloonColor.Blue]: { color: BloonColor.Blue, health: 1, speed: 2.1, children: [BloonColor.Red], childCount: 1, immunities: [], r: 16, money: 1 },
-  [BloonColor.Green]: { color: BloonColor.Green, health: 1, speed: 2.7, children: [BloonColor.Blue], childCount: 1, immunities: [], r: 17, money: 1 },
-  [BloonColor.Yellow]: { color: BloonColor.Yellow, health: 1, speed: 4.8, children: [BloonColor.Green], childCount: 1, immunities: [], r: 18, money: 1 },
-  [BloonColor.Pink]: { color: BloonColor.Pink, health: 1, speed: 5.2, children: [BloonColor.Yellow], childCount: 1, immunities: [], r: 15, money: 1 },
-  [BloonColor.Black]: { color: BloonColor.Black, health: 1, speed: 2.7, children: [BloonColor.Pink], childCount: 2, immunities: [DamageType.Explosive], r: 14, money: 1 },
-  [BloonColor.White]: { color: BloonColor.White, health: 1, speed: 3.0, children: [BloonColor.Pink], childCount: 2, immunities: [DamageType.Freeze], r: 14, money: 1 },
+  [BloonColor.Red]: { color: BloonColor.Red, health: 1, speed: 90, children: [], childCount: 0, immunities: [], r: 15, money: 1, leakLives: 1 },
+  [BloonColor.Blue]: { color: BloonColor.Blue, health: 1, speed: 126, children: [BloonColor.Red], childCount: 1, immunities: [], r: 16, money: 1, leakLives: 1 },
+  [BloonColor.Green]: { color: BloonColor.Green, health: 1, speed: 162, children: [BloonColor.Blue], childCount: 1, immunities: [], r: 17, money: 1, leakLives: 1 },
+  [BloonColor.Yellow]: { color: BloonColor.Yellow, health: 1, speed: 288, children: [BloonColor.Green], childCount: 1, immunities: [], r: 18, money: 1, leakLives: 1 },
+  [BloonColor.Pink]: { color: BloonColor.Pink, health: 1, speed: 312, children: [BloonColor.Yellow], childCount: 1, immunities: [], r: 15, money: 1, leakLives: 1 },
+  [BloonColor.Black]: { color: BloonColor.Black, health: 1, speed: 162, children: [BloonColor.Pink], childCount: 2, immunities: [DamageType.Explosive], r: 14, money: 1, leakLives: 2 },
+  [BloonColor.White]: { color: BloonColor.White, health: 1, speed: 180, children: [BloonColor.Pink], childCount: 2, immunities: [DamageType.Freeze], r: 14, money: 1, leakLives: 2 },
+  [BloonColor.Lead]: { color: BloonColor.Lead, health: 1, speed: 72, children: [BloonColor.Black], childCount: 2, immunities: [DamageType.Sharp], r: 16, money: 1, leakLives: 3 },
+  [BloonColor.Zebra]: { color: BloonColor.Zebra, health: 1, speed: 216, children: [BloonColor.Black, BloonColor.White], childCount: 1, immunities: [], r: 15, money: 1, leakLives: 3 },
 };
 
 export const TOWERS: Record<string, TowerConfig> = {
@@ -154,4 +187,9 @@ export const WAVES: Wave[] = [
   [{ type: BloonColor.White, count: 20, spacing: 0.08 }, { type: BloonColor.Black, count: 20, spacing: 0.08 }, { type: BloonColor.Pink, count: 30, spacing: 0.08 }],
   [{ type: BloonColor.Black, count: 35, spacing: 0.07 }, { type: BloonColor.White, count: 35, spacing: 0.07 }],
   [{ type: BloonColor.Pink, count: 50, spacing: 0.05 }, { type: BloonColor.Black, count: 25, spacing: 0.08 }, { type: BloonColor.White, count: 25, spacing: 0.08 }],
+  [{ type: BloonColor.Lead, count: 14, spacing: 0.3 }, { type: BloonColor.Black, count: 20, spacing: 0.1 }],
+  [{ type: BloonColor.Zebra, count: 20, spacing: 0.18 }, { type: BloonColor.Pink, count: 25, spacing: 0.08 }],
+  [{ type: BloonColor.Lead, count: 24, spacing: 0.18 }, { type: BloonColor.Zebra, count: 16, spacing: 0.16 }],
+  [{ type: BloonColor.Zebra, count: 36, spacing: 0.1 }, { type: BloonColor.Black, count: 36, spacing: 0.08 }],
+  [{ type: BloonColor.Lead, count: 20, spacing: 0.12 }, { type: BloonColor.Zebra, count: 40, spacing: 0.08 }, { type: BloonColor.Pink, count: 40, spacing: 0.06 }],
 ];
