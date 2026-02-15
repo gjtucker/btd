@@ -52,6 +52,8 @@ interface Particle {
   vy: number;
   color: string;
   life: number;
+  maxLife: number;
+  size: number;
 }
 
 export class GameEngine {
@@ -267,7 +269,7 @@ export class GameEngine {
             p.hitBloons.add(b.id);
             this.damageBloon(j, p.damage, p.damageType, p.sourceTowerId);
             p.pierce--;
-            this.createParticle(p.x, p.y, BLOON_STATS[b.type].color);
+            this.createParticle(p.x, p.y, BLOON_STATS[b.type].color, 5);
             if (p.pierce <= 0) {
                 if (p.isExplosive) this.explode(p.x, p.y, 70, p.damage, p.sourceTowerId);
                 this.projectiles.splice(i, 1); break;
@@ -299,7 +301,7 @@ export class GameEngine {
   private fire(tower: Tower, target: Bloon) {
     if (tower.dynamicProjectileSpeed === 0) { // Hitscan
         this.damageBloon(this.bloons.indexOf(target), tower.dynamicDamage, tower.config.damageType, tower.id);
-        this.createParticle(target.x, target.y, '#FFFFFF'); // Flash effect
+        this.createParticle(target.x, target.y, '#FFFFFF', 8); // Flash effect
         return;
     }
 
@@ -351,7 +353,7 @@ export class GameEngine {
               this.damageBloon(i, damage, DamageType.Explosive, towerId);
           }
       }
-      for(let i=0; i<8; i++) this.createParticle(x, y, '#FFA500');
+      for(let i=0; i<8; i++) this.createParticle(x, y, '#FFA500', 6);
   }
 
   private spawnWaveBloon(type: BloonColor) {
@@ -365,66 +367,260 @@ export class GameEngine {
       this.bloons.push({ id: ++this.bloonIdCounter, type, x, y, nodeIndex, distanceTraveled, frozen: 0, glued: 0, onFire: 0 });
   }
 
-  createParticle(x: number, y: number, color: string) {
-      this.particles.push({ x, y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, color, life: 15 });
+  createParticle(x: number, y: number, color: string, size: number) {
+      this.particles.push({ x, y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, color, life: 15, maxLife: 15, size });
+  }
+
+  private getBloonColor(type: BloonColor): string {
+      switch (type) {
+          case BloonColor.Red: return '#ef4444';
+          case BloonColor.Blue: return '#3b82f6';
+          case BloonColor.Green: return '#22c55e';
+          case BloonColor.Yellow: return '#eab308';
+          case BloonColor.Pink: return '#ec4899';
+          case BloonColor.Black: return '#1f2937';
+          case BloonColor.White: return '#f3f4f6';
+          default: return '#ef4444';
+      }
   }
 
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.fillStyle = '#4ADE80';
+
+    // Draw Grass Background
+    const gradient = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 0, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH);
+    gradient.addColorStop(0, '#4ADE80');
+    gradient.addColorStop(1, '#22c55e');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    ctx.strokeStyle = '#D4D4D4';
+    // Draw Subtle Grid Pattern
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < CANVAS_WIDTH; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
+    }
+    for (let y = 0; y < CANVAS_HEIGHT; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
+    }
+
+    // Draw Path Border
+    ctx.strokeStyle = '#a8a29e'; // Stone border color
+    ctx.lineWidth = 48; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
+    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.stroke();
+
+    // Draw Path Road
+    ctx.strokeStyle = '#d6d3d1'; // Light stone path
     ctx.lineWidth = 40; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
     for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
     ctx.stroke();
 
+    // Draw Path Detail (Dashed Line)
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
+    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
+    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     // Draw Range Previews
     if (this.selectedTowerPlacement && this.hoverPos) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.beginPath(); ctx.arc(this.hoverPos.x, this.hoverPos.y, this.selectedTowerPlacement.range, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.stroke();
+        this.drawRangeCircle(ctx, this.hoverPos.x, this.hoverPos.y, this.selectedTowerPlacement.range);
+        // Ghost tower
+        ctx.globalAlpha = 0.5;
+        this.drawTower(ctx, { x: this.hoverPos.x, y: this.hoverPos.y, config: this.selectedTowerPlacement } as Tower);
+        ctx.globalAlpha = 1.0;
     }
     if (this.selectedTowerId) {
         const t = this.towers.find(tw => tw.id === this.selectedTowerId);
         if (t) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.beginPath(); ctx.arc(t.x, t.y, t.dynamicRange, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.stroke();
+            this.drawRangeCircle(ctx, t.x, t.y, t.dynamicRange);
         }
     }
 
-    this.towers.forEach(t => {
-        ctx.fillStyle = t.config.color;
-        ctx.beginPath(); ctx.arc(t.x, t.y, 20, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'black'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath(); ctx.arc(t.x, t.y, 10, 0, Math.PI * 2); ctx.fill();
-        // Upgrade dots
-        for(let i=0; i<t.currentUpgrades; i++) {
-            ctx.fillStyle = '#FFFF00';
-            ctx.beginPath(); ctx.arc(t.x - 12 + i*12, t.y + 12, 3, 0, Math.PI * 2); ctx.fill();
-        }
-    });
+    // Draw Towers
+    this.towers.forEach(t => this.drawTower(ctx, t));
 
-    this.bloons.forEach(b => {
-        const stats = BLOON_STATS[b.type];
-        ctx.fillStyle = stats.color.toLowerCase();
-        if (b.type === BloonColor.Black) ctx.fillStyle = '#1F2937';
-        if (b.type === BloonColor.White) ctx.fillStyle = '#F3F4F6';
-        ctx.beginPath(); ctx.ellipse(b.x, b.y, stats.r * 0.8, stats.r, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-    });
+    // Draw Bloons
+    this.bloons.forEach(b => this.drawBloon(ctx, b));
 
-    this.projectiles.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
-    });
+    // Draw Projectiles
+    this.projectiles.forEach(p => this.drawProjectile(ctx, p));
 
+    // Draw Particles
     this.particles.forEach(p => {
-        ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 15;
-        ctx.fillRect(p.x, p.y, 4, 4); ctx.globalAlpha = 1.0;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
     });
+  }
+
+  private drawRangeCircle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+  }
+
+  private drawTower(ctx: CanvasRenderingContext2D, t: Tower) {
+      // Base
+      ctx.fillStyle = '#1e293b'; // Slate 800
+      ctx.beginPath(); ctx.arc(t.x, t.y, 24, 0, Math.PI * 2); ctx.fill();
+
+      // Body
+      const gradient = ctx.createRadialGradient(t.x - 5, t.y - 5, 5, t.x, t.y, 20);
+      gradient.addColorStop(0, this.lightenColor(t.config.color, 20));
+      gradient.addColorStop(1, t.config.color);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+
+      // Detail based on type
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      // Determine rotation if there is a target (mock rotation for now or last target angle could be stored)
+      // For simplicity, we just draw static details or simple animations
+
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      if (t.config.id === 'DART' || t.config.id === 'SNIPER') {
+          // Bandana / Hat
+          ctx.beginPath(); ctx.ellipse(0, -10, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (t.config.id === 'CANNON') {
+          // Cannon hole
+          ctx.fillStyle = '#000';
+          ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.stroke();
+      } else if (t.config.id === 'TACK') {
+          // Tack holes
+          ctx.fillStyle = '#000';
+          for(let i=0; i<8; i++) {
+              const theta = (Math.PI * 2 * i) / 8;
+              ctx.beginPath(); ctx.arc(Math.cos(theta)*12, Math.sin(theta)*12, 3, 0, Math.PI * 2); ctx.fill();
+          }
+      } else if (t.config.id === 'SUPER') {
+          // Cape
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath(); ctx.moveTo(-10, 10); ctx.lineTo(10, 10); ctx.lineTo(0, 25); ctx.fill();
+      }
+
+      ctx.restore();
+
+      // Upgrades (Stars)
+      const startAngle = -Math.PI / 2;
+      const angleStep = Math.PI / 6;
+      for(let i=0; i<t.currentUpgrades; i++) {
+          const angle = startAngle + (i * angleStep) - ((t.currentUpgrades-1) * angleStep / 2);
+          const ux = t.x + Math.cos(angle) * 26;
+          const uy = t.y + Math.sin(angle) * 26;
+          this.drawStar(ctx, ux, uy, 4, 3, 1.5, '#fbbf24');
+      }
+  }
+
+  private drawBloon(ctx: CanvasRenderingContext2D, b: Bloon) {
+      const stats = BLOON_STATS[b.type];
+      const color = this.getBloonColor(b.type);
+
+      // Knot
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y + stats.r);
+      ctx.lineTo(b.x - 3, b.y + stats.r + 6);
+      ctx.lineTo(b.x + 3, b.y + stats.r + 6);
+      ctx.fill();
+
+      // Body Gradient
+      const gradient = ctx.createRadialGradient(b.x - stats.r/3, b.y - stats.r/3, stats.r/4, b.x, b.y, stats.r);
+      gradient.addColorStop(0, this.lightenColor(color, 50));
+      gradient.addColorStop(1, color);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, stats.r * 0.85, stats.r, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Outline
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Shine
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(b.x - stats.r * 0.3, b.y - stats.r * 0.3, stats.r * 0.2, stats.r * 0.1, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+  }
+
+  private drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
+      ctx.fillStyle = p.color;
+      if (p.damageType === DamageType.Explosive) {
+          // Bomb
+          ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#fff'; // Shine
+          ctx.beginPath(); ctx.arc(p.x - 2, p.y - 2, 2, 0, Math.PI * 2); ctx.fill();
+      } else if (p.damageType === DamageType.Magic) {
+           // Magic Bolt
+           ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+           ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+           ctx.shadowBlur = 0;
+      } else {
+          // Dart / Sharp
+          const angle = Math.atan2(p.vy, p.vx);
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(8, 0);
+          ctx.lineTo(-4, 4);
+          ctx.lineTo(-4, -4);
+          ctx.fill();
+          ctx.restore();
+      }
+  }
+
+  private drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number, color: string) {
+      let rot = Math.PI / 2 * 3;
+      let x = cx;
+      let y = cy;
+      let step = Math.PI / spikes;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerRadius);
+      for (let i = 0; i < spikes; i++) {
+          x = cx + Math.cos(rot) * outerRadius;
+          y = cy + Math.sin(rot) * outerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+
+          x = cx + Math.cos(rot) * innerRadius;
+          y = cy + Math.sin(rot) * innerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+      }
+      ctx.lineTo(cx, cy - outerRadius);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = '#b45309'; // Darker gold outline
+      ctx.lineWidth = 1;
+      ctx.stroke();
+  }
+
+  private lightenColor(color: string, percent: number) {
+      const num = parseInt(color.replace('#', ''), 16),
+      amt = Math.round(2.55 * percent),
+      R = (num >> 16) + amt,
+      B = (num >> 8 & 0x00FF) + amt,
+      G = (num & 0x0000FF) + amt;
+      return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1);
   }
 }
