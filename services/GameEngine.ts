@@ -28,6 +28,7 @@ interface Tower {
   dynamicCooldown: number;
   dynamicPierce: number;
   dynamicProjectileSpeed: number;
+  dynamicIncome: number;
 }
 
 interface Projectile {
@@ -154,6 +155,7 @@ export class GameEngine {
       dynamicCooldown: config.cooldown,
       dynamicPierce: config.pierce,
       dynamicProjectileSpeed: config.projectileSpeed,
+      dynamicIncome: config.income ?? 0,
     });
     this.onStateChange();
     return true;
@@ -176,6 +178,7 @@ export class GameEngine {
     if (upgrade.effect.cooldownMult) tower.dynamicCooldown *= upgrade.effect.cooldownMult;
     if (upgrade.effect.pierce) tower.dynamicPierce += upgrade.effect.pierce;
     if (upgrade.effect.projectileSpeed) tower.dynamicProjectileSpeed += upgrade.effect.projectileSpeed;
+    if (upgrade.effect.income) tower.dynamicIncome += upgrade.effect.income;
 
     this.onStateChange();
     return true;
@@ -279,6 +282,15 @@ export class GameEngine {
     this.towers.forEach(tower => {
       tower.cooldownTimer = Math.max(0, tower.cooldownTimer - dt);
       if (tower.cooldownTimer > 0) return;
+
+      if (tower.config.id === 'FARM') {
+        this.money += tower.dynamicIncome;
+        tower.totalDamageDealt += tower.dynamicIncome;
+        tower.cooldownTimer = tower.dynamicCooldown / 60;
+        this.createParticle(tower.x, tower.y - 20, '#fde047', 10);
+        this.onStateChange();
+        return;
+      }
 
       const target = this.findTarget(tower);
       if (target) {
@@ -568,6 +580,14 @@ export class GameEngine {
           // Cape
           ctx.fillStyle = '#ef4444';
           ctx.beginPath(); ctx.moveTo(-10, 10); ctx.lineTo(10, 10); ctx.lineTo(0, 25); ctx.fill();
+      } else if (t.config.id === 'FARM') {
+          // Banana bunch
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath(); ctx.ellipse(-6, -2, 5, 8, -0.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(0, -5, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(6, -2, 5, 8, 0.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#a16207'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, -17); ctx.stroke();
       }
 
       ctx.restore();
