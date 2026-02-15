@@ -162,11 +162,20 @@ const App: React.FC = () => {
   };
 
   const selectDifficulty = useCallback((nextDifficulty: GameDifficulty) => {
+    if (nextDifficulty === difficulty) {
+      return;
+    }
+
+    const confirmed = window.confirm('Changing difficulty will reset your current game. Continue?');
+    if (!confirmed) {
+      return;
+    }
+
     setDifficulty(nextDifficulty);
     setSelectedTowerId(null);
     setSelectedTowerType(null);
     setActiveTowerStats(null);
-  }, []);
+  }, [difficulty]);
 
   return (
     <div className="flex h-screen w-screen flex-col-reverse lg:flex-row bg-slate-900 text-white overflow-hidden font-sans">
