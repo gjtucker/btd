@@ -1,5 +1,5 @@
-import { BLOON_STATS, DIFFICULTY_PRESETS, PATH_NODES, WAVES, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
-import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, Point, TargetStrategy, TowerConfig, Upgrade, WaveGroup } from '../types';
+import { BLOON_STATS, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, WAVES, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
+import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, GameMap, GameMapId, Point, TargetStrategy, TowerConfig, Upgrade, WaveGroup } from '../types';
 
 interface Bloon {
   id: number;
@@ -85,11 +85,15 @@ export class GameEngine {
   private waveTimer = 0;
   private difficulty: GameDifficulty = GameDifficulty.Medium;
   private difficultyPreset: DifficultyPreset = DIFFICULTY_PRESETS[GameDifficulty.Medium];
+  private mapId: GameMapId = DEFAULT_MAP_ID;
+  private currentMap: GameMap = MAPS[DEFAULT_MAP_ID];
   
   onStateChange: () => void = () => {};
 
-  constructor(onStateChange: () => void, difficulty: GameDifficulty = GameDifficulty.Medium) {
+  constructor(onStateChange: () => void, difficulty: GameDifficulty = GameDifficulty.Medium, mapId: GameMapId = DEFAULT_MAP_ID) {
     this.onStateChange = onStateChange;
+    this.mapId = mapId in MAPS ? mapId : DEFAULT_MAP_ID;
+    this.currentMap = MAPS[this.mapId];
     this.setDifficulty(difficulty, false);
   }
 
@@ -115,6 +119,21 @@ export class GameEngine {
 
   getDifficultyPreset(): DifficultyPreset {
     return this.difficultyPreset;
+  }
+
+  getMapId(): GameMapId {
+    return this.mapId;
+  }
+
+  getMap(): GameMap {
+    return this.currentMap;
+  }
+
+  setMap(mapId: GameMapId, notify: boolean = true) {
+    const nextMapId = mapId in MAPS ? mapId : DEFAULT_MAP_ID;
+    this.mapId = nextMapId;
+    this.currentMap = MAPS[nextMapId];
+    this.setDifficulty(this.difficulty, notify);
   }
 
   getRoundPreview(roundNumber: number = this.round): WaveGroup[] {
@@ -209,9 +228,13 @@ export class GameEngine {
      }
   }
 
+  private get pathNodes(): Point[] {
+    return this.currentMap.nodes;
+  }
+
   private isPointOnPath(x: number, y: number, buffer: number): boolean {
-    for (let i = 0; i < PATH_NODES.length - 1; i++) {
-      const dist = this.distToSegment({x, y}, PATH_NODES[i], PATH_NODES[i + 1]);
+    for (let i = 0; i < this.pathNodes.length - 1; i++) {
+      const dist = this.distToSegment({x, y}, this.pathNodes[i], this.pathNodes[i + 1]);
       if (dist < buffer) return true;
     }
     return false;
@@ -269,8 +292,8 @@ export class GameEngine {
       const speed = stats.speed * (this.round > 20 ? 1 + (this.round - 20) * 0.05 : 1);
       let movementRemaining = speed * dt;
 
-      while (movementRemaining > 0 && b.nodeIndex < PATH_NODES.length - 1) {
-        const targetNode = PATH_NODES[b.nodeIndex + 1];
+      while (movementRemaining > 0 && b.nodeIndex < this.pathNodes.length - 1) {
+        const targetNode = this.pathNodes[b.nodeIndex + 1];
         const dx = targetNode.x - b.x;
         const dy = targetNode.y - b.y;
         const distToNode = Math.sqrt(dx * dx + dy * dy);
@@ -282,7 +305,7 @@ export class GameEngine {
           b.distanceTraveled += distToNode;
           movementRemaining -= distToNode;
 
-          if (b.nodeIndex >= PATH_NODES.length - 1) {
+          if (b.nodeIndex >= this.pathNodes.length - 1) {
             this.lives -= stats.leakLives;
             this.bloons.splice(i, 1);
             this.onStateChange();
@@ -446,7 +469,7 @@ export class GameEngine {
 
   private spawnWaveBloon(type: BloonColor) {
       this.bloons.push({
-          id: ++this.bloonIdCounter, type, x: PATH_NODES[0].x, y: PATH_NODES[0].y,
+          id: ++this.bloonIdCounter, type, x: this.pathNodes[0].x, y: this.pathNodes[0].y,
           nodeIndex: 0, distanceTraveled: 0, health: BLOON_STATS[type].health, frozen: 0, glued: 0, onFire: 0
       });
   }
@@ -491,37 +514,39 @@ export class GameEngine {
 
     this.drawTerrain(ctx);
 
+    const mapTheme = this.currentMap.theme;
+
     // Draw Path Border
-    ctx.strokeStyle = '#8b7355';
+    ctx.strokeStyle = mapTheme.pathBorder;
     ctx.lineWidth = 52; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
-    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.beginPath(); ctx.moveTo(this.pathNodes[0].x, this.pathNodes[0].y);
+    for (let i = 1; i < this.pathNodes.length; i++) ctx.lineTo(this.pathNodes[i].x, this.pathNodes[i].y);
     ctx.stroke();
 
     // Draw Path Road
     const roadGradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    roadGradient.addColorStop(0, '#d3ccbd');
-    roadGradient.addColorStop(0.55, '#c4bcac');
-    roadGradient.addColorStop(1, '#e2dccf');
+    roadGradient.addColorStop(0, mapTheme.pathStart);
+    roadGradient.addColorStop(0.55, mapTheme.pathMid);
+    roadGradient.addColorStop(1, mapTheme.pathEnd);
     ctx.strokeStyle = roadGradient;
     ctx.lineWidth = 42; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
-    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.beginPath(); ctx.moveTo(this.pathNodes[0].x, this.pathNodes[0].y);
+    for (let i = 1; i < this.pathNodes.length; i++) ctx.lineTo(this.pathNodes[i].x, this.pathNodes[i].y);
     ctx.stroke();
 
     // Draw cobblestone seams
-    ctx.strokeStyle = 'rgba(84, 72, 58, 0.35)';
+    ctx.strokeStyle = mapTheme.seamColor;
     ctx.lineWidth = 2; ctx.setLineDash([7, 8]);
-    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
-    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.beginPath(); ctx.moveTo(this.pathNodes[0].x, this.pathNodes[0].y);
+    for (let i = 1; i < this.pathNodes.length; i++) ctx.lineTo(this.pathNodes[i].x, this.pathNodes[i].y);
     ctx.stroke();
 
     // Draw worn center strip
-    ctx.strokeStyle = 'rgba(255, 248, 230, 0.32)';
+    ctx.strokeStyle = mapTheme.stripColor;
     ctx.lineWidth = 10;
     ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
-    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.beginPath(); ctx.moveTo(this.pathNodes[0].x, this.pathNodes[0].y);
+    for (let i = 1; i < this.pathNodes.length; i++) ctx.lineTo(this.pathNodes[i].x, this.pathNodes[i].y);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -561,10 +586,11 @@ export class GameEngine {
   }
 
   private drawTerrain(ctx: CanvasRenderingContext2D) {
+    const mapTheme = this.currentMap.theme;
     const baseGradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    baseGradient.addColorStop(0, '#96c85f');
-    baseGradient.addColorStop(0.5, '#6fab46');
-    baseGradient.addColorStop(1, '#5f8e3b');
+    baseGradient.addColorStop(0, mapTheme.terrainStart);
+    baseGradient.addColorStop(0.5, mapTheme.terrainMid);
+    baseGradient.addColorStop(1, mapTheme.terrainEnd);
     ctx.fillStyle = baseGradient;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
@@ -678,8 +704,8 @@ export class GameEngine {
       ctx.translate(b.x, b.y);
 
       if (b.type === BloonColor.MOAB) {
-          const targetNode = PATH_NODES[b.nodeIndex + 1];
-          const currentNode = PATH_NODES[b.nodeIndex];
+          const targetNode = this.pathNodes[b.nodeIndex + 1];
+          const currentNode = this.pathNodes[b.nodeIndex];
           if (targetNode && currentNode) {
               const angle = Math.atan2(targetNode.y - currentNode.y, targetNode.x - currentNode.x);
               ctx.rotate(angle);

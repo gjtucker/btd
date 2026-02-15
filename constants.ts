@@ -1,4 +1,4 @@
-import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, Point, TowerConfig, Wave } from './types';
+import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, GameMap, GameMapId, TowerConfig, Wave } from './types';
 
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
@@ -34,16 +34,92 @@ export const DIFFICULTY_PRESETS: Record<GameDifficulty, DifficultyPreset> = {
   },
 };
 
-export const PATH_NODES: Point[] = [
-  { x: 0, y: 100 },
-  { x: 200, y: 100 },
-  { x: 200, y: 400 },
-  { x: 400, y: 400 },
-  { x: 400, y: 200 },
-  { x: 600, y: 200 },
-  { x: 600, y: 500 },
-  { x: 800, y: 500 },
-];
+export const DEFAULT_MAP_ID: GameMapId = 'CLASSIC_LOOP';
+
+export const MAPS: Record<GameMapId, GameMap> = {
+  CLASSIC_LOOP: {
+    id: 'CLASSIC_LOOP',
+    label: 'Classic Loop',
+    description: 'Balanced turns and long lanes for mixed tower setups.',
+    nodes: [
+      { x: 0, y: 100 },
+      { x: 200, y: 100 },
+      { x: 200, y: 400 },
+      { x: 400, y: 400 },
+      { x: 400, y: 200 },
+      { x: 600, y: 200 },
+      { x: 600, y: 500 },
+      { x: 800, y: 500 },
+    ],
+    theme: {
+      terrainStart: '#96c85f',
+      terrainMid: '#6fab46',
+      terrainEnd: '#5f8e3b',
+      pathBorder: '#8b7355',
+      pathStart: '#d3ccbd',
+      pathMid: '#c4bcac',
+      pathEnd: '#e2dccf',
+      seamColor: 'rgba(84, 72, 58, 0.35)',
+      stripColor: 'rgba(255, 248, 230, 0.32)',
+    },
+  },
+  RIVER_BEND: {
+    id: 'RIVER_BEND',
+    label: 'River Bend',
+    description: 'A curvy route that rewards flexible target coverage.',
+    nodes: [
+      { x: 0, y: 520 },
+      { x: 150, y: 520 },
+      { x: 150, y: 140 },
+      { x: 350, y: 140 },
+      { x: 350, y: 460 },
+      { x: 520, y: 460 },
+      { x: 520, y: 220 },
+      { x: 740, y: 220 },
+      { x: 740, y: 80 },
+      { x: 800, y: 80 },
+    ],
+    theme: {
+      terrainStart: '#67b8d9',
+      terrainMid: '#3fa3cc',
+      terrainEnd: '#2f8ab0',
+      pathBorder: '#6b7280',
+      pathStart: '#d8dde5',
+      pathMid: '#c6d0dc',
+      pathEnd: '#eef2f9',
+      seamColor: 'rgba(71, 85, 105, 0.35)',
+      stripColor: 'rgba(255, 255, 255, 0.28)',
+    },
+  },
+  QUARRY_RUN: {
+    id: 'QUARRY_RUN',
+    label: 'Quarry Run',
+    description: 'Tight corners and a late rush lane through rocky ground.',
+    nodes: [
+      { x: 0, y: 280 },
+      { x: 130, y: 280 },
+      { x: 130, y: 520 },
+      { x: 300, y: 520 },
+      { x: 300, y: 90 },
+      { x: 500, y: 90 },
+      { x: 500, y: 350 },
+      { x: 670, y: 350 },
+      { x: 670, y: 520 },
+      { x: 800, y: 520 },
+    ],
+    theme: {
+      terrainStart: '#9ca3af',
+      terrainMid: '#6b7280',
+      terrainEnd: '#4b5563',
+      pathBorder: '#6b4f3a',
+      pathStart: '#d4c3ad',
+      pathMid: '#c6b39d',
+      pathEnd: '#eddcc8',
+      seamColor: 'rgba(88, 64, 44, 0.35)',
+      stripColor: 'rgba(255, 239, 213, 0.28)',
+    },
+  },
+};
 
 export const BLOON_STATS: Record<BloonColor, BloonLayer> = {
   [BloonColor.Red]: { color: BloonColor.Red, health: 1, speed: 90, children: [], childCount: 0, immunities: [], r: 15, money: 1, leakLives: 1 },
