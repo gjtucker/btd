@@ -331,8 +331,8 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen w-screen flex-col-reverse lg:flex-row bg-slate-900 text-white overflow-hidden font-sans">
-      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[52vh] lg:max-h-none">
+    <div className="flex min-h-screen w-screen flex-col-reverse lg:h-screen lg:flex-row bg-slate-900 text-white overflow-y-auto lg:overflow-hidden font-sans">
+      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-none lg:max-h-none">
         <div className="p-4 lg:p-6 bg-slate-900 border-b border-slate-700">
           <h1 className="text-2xl font-bold text-yellow-400 tracking-tight flex items-center gap-2">
             <Trophy className="w-6 h-6" /> BTD Clone Pro
@@ -456,7 +456,7 @@ const App: React.FC = () => {
           {towerList}
         </div>
 
-        <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-3">
+        <div className="lg:hidden max-h-[40vh] overflow-y-auto p-3 space-y-3">
           {mobilePanel === 'build' && <div className="space-y-2">{towerList}</div>}
           {mobilePanel === 'intel' && (
             <p className="text-xs text-slate-300 bg-slate-900/70 border border-slate-700 rounded-lg p-3">
