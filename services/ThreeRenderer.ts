@@ -2,6 +2,8 @@ import { GameEngine } from './GameEngine';
 import { BLOON_STATS, CANVAS_HEIGHT, CANVAS_WIDTH } from '../constants';
 import { GameMap } from '../types';
 
+type GroundPoint = { x: number; y: number };
+
 export class ThreeRenderer {
   private container: HTMLElement;
   private canvas: HTMLCanvasElement;
@@ -19,7 +21,7 @@ export class ThreeRenderer {
 
     const context = this.canvas.getContext('2d');
     if (!context) {
-      throw new Error('Failed to initialize canvas renderer');
+      throw new Error('Failed to initialize renderer canvas');
     }
 
     this.ctx = context;
@@ -41,125 +43,161 @@ export class ThreeRenderer {
     this.currentMap = map;
   }
 
+  private project(x: number, y: number, height = 0): GroundPoint {
+    const horizon = 80;
+    const tilt = 0.62;
+    const screenY = y * tilt + horizon - height;
+    return { x, y: screenY };
+  }
+
   private drawMap(map: GameMap) {
-    this.ctx.fillStyle = map.theme.terrainMid;
+    this.ctx.fillStyle = map.theme.terrainDark;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    this.ctx.strokeStyle = map.theme.pathMid;
-    this.ctx.lineWidth = 40;
+    const top = this.project(0, 0).y;
+    const bottom = this.project(0, CANVAS_HEIGHT).y;
+    const gradient = this.ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, map.theme.terrainLight);
+    gradient.addColorStop(0.45, map.theme.terrainMid);
+    gradient.addColorStop(1, map.theme.terrainDark);
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(0, top, CANVAS_WIDTH, bottom - top);
+
+    const projectedNodes = map.nodes.map((node) => this.project(node.x, node.y));
+
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
+
+    this.ctx.strokeStyle = '#00000055';
+    this.ctx.lineWidth = 50;
     this.ctx.beginPath();
-    this.ctx.moveTo(map.nodes[0].x, map.nodes[0].y);
-
-    for (let i = 1; i < map.nodes.length; i++) {
-      this.ctx.lineTo(map.nodes[i].x, map.nodes[i].y);
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y + 6);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y + 6);
     }
+    this.ctx.stroke();
 
+    this.ctx.strokeStyle = map.theme.pathDark;
+    this.ctx.lineWidth = 42;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y);
+    }
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = map.theme.pathLight;
+    this.ctx.lineWidth = 22;
+    this.ctx.beginPath();
+    this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y - 1);
+    for (let i = 1; i < projectedNodes.length; i++) {
+      this.ctx.lineTo(projectedNodes[i].x, projectedNodes[i].y - 1);
+    }
     this.ctx.stroke();
   }
 
-  private drawBloons(engine: GameEngine) {
-    engine.bloons.forEach((bloon) => {
-      const stats = BLOON_STATS[bloon.type];
+  private drawPlacementRange(engine: GameEngine) {
+    if (!engine.selectedTowerPlacement || !engine.hoverPos) return;
 
-      this.ctx.save();
-      this.ctx.translate(bloon.x, bloon.y);
+    const center = this.project(engine.hoverPos.x, engine.hoverPos.y);
 
-      if (bloon.type === 'MOAB') {
-        this.ctx.fillStyle = '#3b82f6';
-        this.ctx.beginPath();
-        this.ctx.ellipse(0, 0, stats.r * 1.8, stats.r * 1.2, 0, 0, Math.PI * 2);
-        this.ctx.fill();
-      } else {
-        this.ctx.fillStyle = this.getBloonColor(bloon.type);
-        this.ctx.beginPath();
-        this.ctx.ellipse(0, 0, stats.r * 0.9, stats.r * 1.1, 0, 0, Math.PI * 2);
-        this.ctx.fill();
+    this.ctx.strokeStyle = '#ffffffbb';
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([6, 6]);
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y, engine.selectedTowerPlacement.range, engine.selectedTowerPlacement.range * 0.62, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
 
-        this.ctx.fillStyle = '#111827';
-        this.ctx.beginPath();
-        this.ctx.moveTo(-3, stats.r * 0.7);
-        this.ctx.lineTo(0, stats.r + 7);
-        this.ctx.lineTo(3, stats.r * 0.7);
-        this.ctx.closePath();
-        this.ctx.fill();
-      }
-
-      this.ctx.restore();
-    });
+    this.ctx.fillStyle = `${engine.selectedTowerPlacement.color}88`;
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y - 10, 18, 10, 0, 0, Math.PI * 2);
+    this.ctx.fill();
   }
 
-  private drawTowers(engine: GameEngine) {
-    engine.towers.forEach((tower) => {
-      this.ctx.fillStyle = '#1e293b';
-      this.ctx.beginPath();
-      this.ctx.arc(tower.x, tower.y, 22, 0, Math.PI * 2);
-      this.ctx.fill();
+  private drawSelectionRange(engine: GameEngine) {
+    if (!engine.selectedTowerId) return;
+    const tower = engine.towers.find((candidate) => candidate.id === engine.selectedTowerId);
+    if (!tower) return;
 
-      this.ctx.fillStyle = tower.config.color;
-      this.ctx.beginPath();
-      this.ctx.arc(tower.x, tower.y, 16, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      this.ctx.fillStyle = '#0f172a';
-      this.ctx.beginPath();
-      this.ctx.arc(tower.x + 8, tower.y - 8, 6, 0, Math.PI * 2);
-      this.ctx.fill();
-    });
+    const center = this.project(tower.x, tower.y);
+    this.ctx.strokeStyle = '#ffffffaa';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.ellipse(center.x, center.y, tower.dynamicRange, tower.dynamicRange * 0.62, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
   }
 
-  private drawProjectiles(engine: GameEngine) {
-    engine.projectiles.forEach((projectile) => {
-      this.ctx.fillStyle = projectile.color;
-      this.ctx.beginPath();
-      this.ctx.arc(projectile.x, projectile.y, projectile.damageType === 'Explosive' ? 6 : 4, 0, Math.PI * 2);
-      this.ctx.fill();
-    });
+  private drawTower(x: number, y: number, color: string) {
+    const base = this.project(x, y);
+
+    this.ctx.fillStyle = '#00000055';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x + 5, base.y + 8, 26, 14, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x, base.y - 8, 24, 11, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x, base.y - 28, 18, 14, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.beginPath();
+    this.ctx.ellipse(base.x + 8, base.y - 36, 6, 5, 0, 0, Math.PI * 2);
+    this.ctx.fill();
   }
 
-  private drawParticles(engine: GameEngine) {
-    engine.particles.forEach((particle) => {
-      this.ctx.globalAlpha = Math.max(particle.life / particle.maxLife, 0);
-      this.ctx.fillStyle = particle.color;
-      this.ctx.beginPath();
-      this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.globalAlpha = 1;
-    });
-  }
+  private drawBloon(x: number, y: number, type: string) {
+    const stats = BLOON_STATS[type as keyof typeof BLOON_STATS];
+    const body = this.project(x, y, 20);
+    const shadow = this.project(x, y);
 
-  private drawRangeUi(engine: GameEngine) {
-    if (engine.selectedTowerPlacement && engine.hoverPos) {
-      this.ctx.globalAlpha = 0.25;
-      this.ctx.fillStyle = engine.selectedTowerPlacement.color;
-      this.ctx.beginPath();
-      this.ctx.arc(engine.hoverPos.x, engine.hoverPos.y, 16, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.globalAlpha = 1;
+    this.ctx.fillStyle = '#00000066';
+    this.ctx.beginPath();
+    this.ctx.ellipse(shadow.x + 4, shadow.y + 5, stats.r, stats.r * 0.45, 0, 0, Math.PI * 2);
+    this.ctx.fill();
 
-      this.ctx.strokeStyle = '#ffffff';
-      this.ctx.lineWidth = 2;
-      this.ctx.setLineDash([6, 6]);
-      this.ctx.beginPath();
-      this.ctx.arc(engine.hoverPos.x, engine.hoverPos.y, engine.selectedTowerPlacement.range, 0, Math.PI * 2);
-      this.ctx.stroke();
-      this.ctx.setLineDash([]);
-      return;
+    this.ctx.fillStyle = this.getBloonColor(type);
+    this.ctx.beginPath();
+    if (type === 'MOAB') {
+      this.ctx.ellipse(body.x, body.y, stats.r * 1.8, stats.r * 0.9, 0, 0, Math.PI * 2);
+    } else {
+      this.ctx.ellipse(body.x, body.y, stats.r * 0.95, stats.r * 1.25, 0, 0, Math.PI * 2);
     }
+    this.ctx.fill();
 
-    if (engine.selectedTowerId) {
-      const selected = engine.towers.find((tower) => tower.id === engine.selectedTowerId);
-      if (!selected) return;
-
-      this.ctx.strokeStyle = '#ffffff';
-      this.ctx.globalAlpha = 0.6;
-      this.ctx.lineWidth = 2;
+    if (type !== 'MOAB') {
+      this.ctx.fillStyle = '#111827';
       this.ctx.beginPath();
-      this.ctx.arc(selected.x, selected.y, selected.dynamicRange, 0, Math.PI * 2);
-      this.ctx.stroke();
-      this.ctx.globalAlpha = 1;
+      this.ctx.moveTo(body.x - 3, body.y + stats.r * 0.95);
+      this.ctx.lineTo(body.x, body.y + stats.r + 9);
+      this.ctx.lineTo(body.x + 3, body.y + stats.r * 0.95);
+      this.ctx.closePath();
+      this.ctx.fill();
     }
+  }
+
+  private drawProjectile(x: number, y: number, color: string, explosive: boolean) {
+    const p = this.project(x, y, explosive ? 14 : 20);
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.ellipse(p.x, p.y, explosive ? 7 : 4, explosive ? 5 : 3, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
+  private drawParticle(x: number, y: number, size: number, color: string, alpha: number) {
+    const p = this.project(x, y, 18);
+    this.ctx.globalAlpha = alpha;
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.globalAlpha = 1;
   }
 
   private getBloonColor(type: string): string {
@@ -174,6 +212,7 @@ export class ThreeRenderer {
       case 'Zebra': return '#111827';
       case 'Rainbow': return '#6366f1';
       case 'Ceramic': return '#fdba74';
+      case 'MOAB': return '#3b82f6';
       default: return '#ef4444';
     }
   }
@@ -182,10 +221,27 @@ export class ThreeRenderer {
     const map = this.currentMap ?? engine.getMap();
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     this.drawMap(map);
-    this.drawRangeUi(engine);
-    this.drawTowers(engine);
-    this.drawBloons(engine);
-    this.drawProjectiles(engine);
-    this.drawParticles(engine);
+    this.drawPlacementRange(engine);
+    this.drawSelectionRange(engine);
+
+    const drawQueue: Array<{ depth: number; draw: () => void }> = [];
+
+    engine.towers.forEach((tower) => {
+      drawQueue.push({ depth: tower.y, draw: () => this.drawTower(tower.x, tower.y, tower.config.color) });
+    });
+
+    engine.bloons.forEach((bloon) => {
+      drawQueue.push({ depth: bloon.y, draw: () => this.drawBloon(bloon.x, bloon.y, bloon.type) });
+    });
+
+    engine.projectiles.forEach((projectile) => {
+      drawQueue.push({ depth: projectile.y, draw: () => this.drawProjectile(projectile.x, projectile.y, projectile.color, projectile.damageType === 'Explosive') });
+    });
+
+    drawQueue.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
+
+    engine.particles.forEach((particle) => {
+      this.drawParticle(particle.x, particle.y, particle.size, particle.color, Math.max(0, particle.life / particle.maxLife));
+    });
   }
 }
