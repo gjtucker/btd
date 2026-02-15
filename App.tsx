@@ -150,27 +150,33 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const getGameCoordinates = useCallback((clientX: number, clientY: number) => {
+  const getCanvasCoordinates = useCallback((clientX: number, clientY: number) => {
     if (!containerRef.current) return null;
     const rect = containerRef.current.getBoundingClientRect();
 
-    const screenPoint = {
+    return {
       x: (clientX - rect.left) * (CANVAS_WIDTH / rect.width),
       y: (clientY - rect.top) * (CANVAS_HEIGHT / rect.height),
     };
+  }, []);
+
+  const getGameCoordinates = useCallback((clientX: number, clientY: number) => {
+    const screenPoint = getCanvasCoordinates(clientX, clientY);
+    if (!screenPoint) return null;
 
     if (threeRendererRef.current) {
       return threeRendererRef.current.screenToWorld(screenPoint.x, screenPoint.y);
     }
 
     return screenPoint;
-  }, []);
+  }, [getCanvasCoordinates]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!engineRef.current) return;
     if (isMusicEnabled) midiRef.current?.start();
+    const screenCoords = getCanvasCoordinates(e.clientX, e.clientY);
     const coords = getGameCoordinates(e.clientX, e.clientY);
-    if (!coords) return;
+    if (!coords || !screenCoords) return;
 
     if (selectedTowerType) {
       const success = engineRef.current.placeTower(coords.x, coords.y, selectedTowerType);
@@ -179,18 +185,32 @@ const App: React.FC = () => {
         engineRef.current.selectedTowerPlacement = null;
       }
     } else {
-      const clickedTower = engineRef.current.towers.find(t => Math.sqrt((t.x - coords.x)**2 + (t.y - coords.y)**2) < 25);
+      const clickedTower = engineRef.current.towers
+        .map((tower) => {
+          if (threeRendererRef.current) {
+            const projectedTowerCenter = threeRendererRef.current.worldToScreen(tower.x, tower.y, 20);
+            const distance = Math.hypot(projectedTowerCenter.x - screenCoords.x, projectedTowerCenter.y - screenCoords.y);
+            return distance <= 28 ? { tower, distance } : null;
+          }
+
+          const distance = Math.hypot(tower.x - coords.x, tower.y - coords.y);
+          return distance <= 25 ? { tower, distance } : null;
+        })
+        .filter((result): result is { tower: (typeof engineRef.current.towers)[number]; distance: number } => result !== null)
+        .sort((a, b) => a.distance - b.distance)[0]?.tower;
+
       if (clickedTower) {
         setSelectedTowerId(clickedTower.id);
         engineRef.current.selectedTowerId = clickedTower.id;
         syncSelectedTowerStats(clickedTower.id);
+        setMobilePanel('tower');
       } else {
         setSelectedTowerId(null);
         engineRef.current.selectedTowerId = null;
         syncSelectedTowerStats(null);
       }
     }
-  }, [getGameCoordinates, isMusicEnabled, selectedTowerType, syncSelectedTowerStats]);
+  }, [getCanvasCoordinates, getGameCoordinates, isMusicEnabled, selectedTowerType, syncSelectedTowerStats]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!engineRef.current) return;
@@ -253,12 +273,6 @@ const App: React.FC = () => {
     setSelectedTowerType(null);
     setActiveTowerStats(null);
   }, [mapId]);
-
-  useEffect(() => {
-    if (selectedTowerId !== null && activeTowerStats) {
-      setMobilePanel('tower');
-    }
-  }, [activeTowerStats, selectedTowerId]);
 
   const towerList = (
     <>
