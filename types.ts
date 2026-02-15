@@ -11,6 +11,7 @@ export enum BloonColor {
   Zebra = 'Zebra',
   Rainbow = 'Rainbow',
   Ceramic = 'Ceramic',
+  MOAB = 'MOAB',
 }
 
 export enum DamageType {

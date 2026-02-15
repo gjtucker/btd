@@ -57,6 +57,7 @@ export const BLOON_STATS: Record<BloonColor, BloonLayer> = {
   [BloonColor.Zebra]: { color: BloonColor.Zebra, health: 1, speed: 216, children: [BloonColor.Black, BloonColor.White], childCount: 1, immunities: [], r: 15, money: 1, leakLives: 3 },
   [BloonColor.Rainbow]: { color: BloonColor.Rainbow, health: 1, speed: 228, children: [BloonColor.Zebra], childCount: 2, immunities: [], r: 16, money: 1, leakLives: 4 },
   [BloonColor.Ceramic]: { color: BloonColor.Ceramic, health: 10, speed: 180, children: [BloonColor.Rainbow], childCount: 2, immunities: [], r: 18, money: 2, leakLives: 10 },
+  [BloonColor.MOAB]: { color: BloonColor.MOAB, health: 200, speed: 60, children: [BloonColor.Ceramic], childCount: 4, immunities: [], r: 35, money: 100, leakLives: 100 },
 };
 
 export const TOWERS: Record<string, TowerConfig> = {
@@ -194,4 +195,5 @@ export const WAVES: Wave[] = [
   [{ type: BloonColor.Lead, count: 24, spacing: 0.18 }, { type: BloonColor.Zebra, count: 16, spacing: 0.16 }, { type: BloonColor.Rainbow, count: 12, spacing: 0.12 }],
   [{ type: BloonColor.Zebra, count: 36, spacing: 0.1 }, { type: BloonColor.Black, count: 36, spacing: 0.08 }, { type: BloonColor.Ceramic, count: 8, spacing: 0.25 }],
   [{ type: BloonColor.Lead, count: 20, spacing: 0.12 }, { type: BloonColor.Zebra, count: 40, spacing: 0.08 }, { type: BloonColor.Pink, count: 40, spacing: 0.06 }, { type: BloonColor.Ceramic, count: 12, spacing: 0.2 }],
+  [{ type: BloonColor.MOAB, count: 1, spacing: 1.0 }],
 ];

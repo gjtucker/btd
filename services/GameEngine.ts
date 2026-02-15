@@ -436,6 +436,7 @@ export class GameEngine {
           case BloonColor.Zebra: return '#111827';
           case BloonColor.Rainbow: return '#6366f1';
           case BloonColor.Ceramic: return '#fdba74';
+          case BloonColor.MOAB: return '#3b82f6';
           default: return '#ef4444';
       }
   }
@@ -601,7 +602,11 @@ export class GameEngine {
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.ellipse(b.x, b.y, stats.r * 0.85, stats.r, 0, 0, Math.PI * 2);
+      if (b.type === BloonColor.MOAB) {
+          ctx.ellipse(b.x, b.y, stats.r * 1.5, stats.r, 0, 0, Math.PI * 2);
+      } else {
+          ctx.ellipse(b.x, b.y, stats.r * 0.85, stats.r, 0, 0, Math.PI * 2);
+      }
       ctx.fill();
 
       // Outline
