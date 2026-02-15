@@ -1,5 +1,5 @@
-import { BLOON_STATS, PATH_NODES, WAVES, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
-import { BloonColor, BloonLayer, DamageType, Point, TargetStrategy, TowerConfig, Upgrade } from '../types';
+import { BLOON_STATS, DIFFICULTY_PRESETS, PATH_NODES, WAVES, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
+import { BloonColor, BloonLayer, DamageType, DifficultyPreset, GameDifficulty, Point, TargetStrategy, TowerConfig, Upgrade, WaveGroup } from '../types';
 
 interface Bloon {
   id: number;
@@ -18,7 +18,7 @@ interface Tower {
   x: number;
   y: number;
   config: TowerConfig;
-  cooldownTimer: number;
+  cooldownTimer: number; // seconds until next shot
   strategy: TargetStrategy;
   totalDamageDealt: number;
   currentUpgrades: number;
@@ -37,7 +37,7 @@ interface Projectile {
   vy: number;
   damage: number;
   pierce: number;
-  lifespan: number;
+  lifespan: number; // seconds remaining
   damageType: DamageType;
   hitBloons: Set<number>;
   color: string;
@@ -77,11 +77,42 @@ export class GameEngine {
   private waveGroupIndex = 0;
   private waveCountRemaining = 0;
   private waveTimer = 0;
+  private difficulty: GameDifficulty = GameDifficulty.Medium;
+  private difficultyPreset: DifficultyPreset = DIFFICULTY_PRESETS[GameDifficulty.Medium];
   
   onStateChange: () => void = () => {};
 
-  constructor(onStateChange: () => void) {
+  constructor(onStateChange: () => void, difficulty: GameDifficulty = GameDifficulty.Medium) {
     this.onStateChange = onStateChange;
+    this.setDifficulty(difficulty, false);
+  }
+
+  setDifficulty(difficulty: GameDifficulty, notify: boolean = true) {
+    this.difficulty = difficulty;
+    this.difficultyPreset = DIFFICULTY_PRESETS[difficulty] ?? DIFFICULTY_PRESETS[GameDifficulty.Medium];
+    this.money = this.difficultyPreset.startingMoney;
+    this.lives = this.difficultyPreset.startingLives;
+    this.round = 1;
+    this.isRoundActive = false;
+    this.isGameOver = false;
+    this.bloons = [];
+    this.projectiles = [];
+    this.particles = [];
+    this.towers = [];
+    this.waveGroupIndex = 0;
+    this.waveCountRemaining = 0;
+    this.waveTimer = 0;
+    this.selectedTowerId = null;
+    this.selectedTowerPlacement = null;
+    if (notify) this.onStateChange();
+  }
+
+  getDifficultyPreset(): DifficultyPreset {
+    return this.difficultyPreset;
+  }
+
+  getRoundPreview(roundNumber: number = this.round): WaveGroup[] {
+    return WAVES[roundNumber - 1] ?? [];
   }
 
   startRound() {
@@ -152,7 +183,7 @@ export class GameEngine {
   sellTower(id: number) {
     const idx = this.towers.findIndex(t => t.id === id);
     if (idx !== -1) {
-      this.money += Math.floor(this.towers[idx].config.cost * 0.7);
+      this.money += Math.floor(this.towers[idx].config.cost * this.difficultyPreset.sellbackRate);
       this.towers.splice(idx, 1);
       this.onStateChange();
     }
@@ -211,7 +242,7 @@ export class GameEngine {
            }
         } else if (this.bloons.length === 0) {
            this.isRoundActive = false;
-           this.money += 100 + this.round;
+           this.money += Math.floor((this.difficultyPreset.roundBonusBase + this.round * this.difficultyPreset.roundBonusScale));
            this.round++;
            this.onStateChange();
         }
@@ -229,14 +260,15 @@ export class GameEngine {
       const dx = targetNode.x - currentNode.x;
       const dy = targetNode.y - currentNode.y;
       const totalDist = Math.sqrt(dx*dx + dy*dy);
-      b.x += (dx / totalDist) * speed;
-      b.y += (dy / totalDist) * speed;
-      b.distanceTraveled += speed;
-      if (Math.sqrt((targetNode.x - b.x)**2 + (targetNode.y - b.y)**2) < speed) {
+      const movement = speed * dt;
+      b.x += (dx / totalDist) * movement;
+      b.y += (dy / totalDist) * movement;
+      b.distanceTraveled += movement;
+      if (Math.sqrt((targetNode.x - b.x)**2 + (targetNode.y - b.y)**2) < movement) {
         b.nodeIndex++;
         b.x = targetNode.x; b.y = targetNode.y;
         if (b.nodeIndex >= PATH_NODES.length - 1) {
-          this.lives -= stats.health;
+          this.lives -= stats.leakLives;
           this.bloons.splice(i, 1);
           this.onStateChange();
         }
@@ -244,20 +276,20 @@ export class GameEngine {
     }
 
     this.towers.forEach(tower => {
-      if (tower.cooldownTimer > 0) tower.cooldownTimer--;
-      else {
-        const target = this.findTarget(tower);
-        if (target) {
-            this.fire(tower, target);
-            tower.cooldownTimer = tower.dynamicCooldown;
-        }
+      tower.cooldownTimer = Math.max(0, tower.cooldownTimer - dt);
+      if (tower.cooldownTimer > 0) return;
+
+      const target = this.findTarget(tower);
+      if (target) {
+          this.fire(tower, target);
+          tower.cooldownTimer = tower.dynamicCooldown / 60;
       }
     });
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
-      p.x += p.vx; p.y += p.vy;
-      p.lifespan--;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.lifespan -= dt;
       if (p.x < 0 || p.x > CANVAS_WIDTH || p.y < 0 || p.y > CANVAS_HEIGHT || p.lifespan <= 0) {
         this.projectiles.splice(i, 1); continue;
       }
@@ -311,16 +343,16 @@ export class GameEngine {
             const theta = (Math.PI * 2 * i) / 8;
             this.projectiles.push({
                 id: ++this.projectileIdCounter, x: tower.x, y: tower.y,
-                vx: Math.cos(theta) * tower.dynamicProjectileSpeed, vy: Math.sin(theta) * tower.dynamicProjectileSpeed,
-                damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 40, damageType: tower.config.damageType,
+                vx: Math.cos(theta) * tower.dynamicProjectileSpeed * 60, vy: Math.sin(theta) * tower.dynamicProjectileSpeed * 60,
+                damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 40 / 60, damageType: tower.config.damageType,
                 hitBloons: new Set(), color: tower.config.color, sourceTowerId: tower.id, isExplosive: false
             });
         }
     } else {
         this.projectiles.push({
             id: ++this.projectileIdCounter, x: tower.x, y: tower.y,
-            vx: Math.cos(angle) * tower.dynamicProjectileSpeed, vy: Math.sin(angle) * tower.dynamicProjectileSpeed,
-            damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 120, damageType: tower.config.damageType,
+            vx: Math.cos(angle) * tower.dynamicProjectileSpeed * 60, vy: Math.sin(angle) * tower.dynamicProjectileSpeed * 60,
+            damage: tower.dynamicDamage, pierce: tower.dynamicPierce, lifespan: 120 / 60, damageType: tower.config.damageType,
             hitBloons: new Set(), color: tower.config.color, sourceTowerId: tower.id,
             isExplosive: tower.config.damageType === DamageType.Explosive
         });
@@ -340,9 +372,11 @@ export class GameEngine {
      this.bloons.splice(index, 1);
 
      if (stats.children.length > 0) {
-         for (let k = 0; k < stats.childCount; k++) {
-             this.spawnChild(stats.children[0], px, py, pn, pd - (k * 10)); 
-         }
+         stats.children.forEach((childType, childIndex) => {
+             for (let k = 0; k < stats.childCount; k++) {
+                 this.spawnChild(childType, px, py, pn, pd - ((childIndex * stats.childCount + k) * 10));
+             }
+         });
      }
      this.onStateChange();
   }
@@ -380,6 +414,8 @@ export class GameEngine {
           case BloonColor.Pink: return '#ec4899';
           case BloonColor.Black: return '#1f2937';
           case BloonColor.White: return '#f3f4f6';
+          case BloonColor.Lead: return '#6b7280';
+          case BloonColor.Zebra: return '#111827';
           default: return '#ef4444';
       }
   }
@@ -552,6 +588,25 @@ export class GameEngine {
       ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      if (b.type === BloonColor.Zebra) {
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = 3;
+          for (let i = -1; i <= 1; i++) {
+              ctx.beginPath();
+              ctx.moveTo(b.x - stats.r * 0.55, b.y + (i * stats.r * 0.35));
+              ctx.lineTo(b.x + stats.r * 0.55, b.y + (i * stats.r * 0.35));
+              ctx.stroke();
+          }
+      }
+
+      if (b.type === BloonColor.Lead) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, stats.r * 0.55, -Math.PI / 2.5, Math.PI / 2.5);
+          ctx.stroke();
+      }
 
       // Shine
       ctx.fillStyle = 'rgba(255,255,255,0.4)';

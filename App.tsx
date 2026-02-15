@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
-import { BLOON_STATS, CANVAS_HEIGHT, CANVAS_WIDTH, TOWERS } from './constants';
-import { TowerConfig, Upgrade } from './types';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DIFFICULTY_PRESETS, TOWERS } from './constants';
+import { BloonColor, GameDifficulty, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Info, Zap, TrendingUp } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -10,14 +10,16 @@ const App: React.FC = () => {
   const requestRef = useRef<number>();
   const [lastTime, setLastTime] = useState(0);
 
-  const [money, setMoney] = useState(650);
-  const [lives, setLives] = useState(100);
+  const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.Medium);
+  const [money, setMoney] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
+  const [lives, setLives] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingLives);
   const [round, setRound] = useState(1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [selectedTowerId, setSelectedTowerId] = useState<number | null>(null);
   const [selectedTowerType, setSelectedTowerType] = useState<TowerConfig | null>(null);
   const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number} | null>(null);
+  const [roundPreview, setRoundPreview] = useState<string[]>([]);
 
   const updateStats = useCallback(() => {
     if (engineRef.current) {
@@ -26,6 +28,9 @@ const App: React.FC = () => {
       setRound(engineRef.current.round);
       setIsRoundActive(engineRef.current.isRoundActive);
       setIsGameOver(engineRef.current.isGameOver);
+      setRoundPreview(
+        engineRef.current.getRoundPreview().map(group => `${group.count}x ${group.type}`)
+      );
       
       if (selectedTowerId !== null) {
           const t = engineRef.current.towers.find(tower => tower.id === selectedTowerId);
@@ -46,8 +51,9 @@ const App: React.FC = () => {
   }, [selectedTowerId]);
 
   useEffect(() => {
-    const engine = new GameEngine(updateStats);
+    const engine = new GameEngine(updateStats, difficulty);
     engineRef.current = engine;
+    updateStats();
     const animate = (time: number) => {
       const dt = (time - lastTime) / 1000;
       const safeDt = Math.min(dt, 0.1); 
@@ -63,7 +69,7 @@ const App: React.FC = () => {
     };
     requestRef.current = requestAnimationFrame(animate);
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-  }, [updateStats]);
+  }, [updateStats, difficulty]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !engineRef.current) return;
@@ -104,6 +110,25 @@ const App: React.FC = () => {
   const changeStrategy = () => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } };
   const buyUpgrade = () => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } };
 
+  const bloonBadgeColor: Record<BloonColor, string> = {
+    [BloonColor.Red]: 'bg-red-500',
+    [BloonColor.Blue]: 'bg-blue-500',
+    [BloonColor.Green]: 'bg-green-500',
+    [BloonColor.Yellow]: 'bg-yellow-400 text-black',
+    [BloonColor.Pink]: 'bg-pink-500',
+    [BloonColor.Black]: 'bg-slate-900',
+    [BloonColor.White]: 'bg-slate-200 text-black',
+    [BloonColor.Lead]: 'bg-slate-500',
+    [BloonColor.Zebra]: 'bg-gradient-to-r from-slate-900 to-slate-100 text-black',
+  };
+
+  const selectDifficulty = (nextDifficulty: GameDifficulty) => {
+    setDifficulty(nextDifficulty);
+    setSelectedTowerId(null);
+    setSelectedTowerType(null);
+    setActiveTowerStats(null);
+  };
+
   return (
     <div className="flex h-screen w-screen bg-slate-900 text-white overflow-hidden font-sans">
       <div className="w-80 bg-slate-800 flex flex-col border-r border-slate-700 shadow-xl z-10">
@@ -125,6 +150,49 @@ const App: React.FC = () => {
               <span>Round {round}</span>
               {isRoundActive ? <span className="text-yellow-400 animate-pulse text-xs uppercase font-bold">Active</span> : <span className="text-slate-500 text-xs uppercase font-bold">Ready</span>}
            </div>
+        </div>
+
+
+        <div className="px-4 pb-4 border-b border-slate-700 space-y-3">
+          <div>
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Difficulty</p>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.values(GameDifficulty).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => selectDifficulty(mode)}
+                  disabled={isRoundActive}
+                  className={`text-[10px] py-2 rounded border transition-colors font-bold uppercase ${
+                    difficulty === mode
+                      ? 'bg-blue-600 border-blue-400 text-white'
+                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  } ${isRoundActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {DIFFICULTY_PRESETS[mode].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-slate-900/70 border border-slate-700 rounded-lg p-3">
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Next Round Intel</p>
+            {roundPreview.length > 0 ? (
+              <div className="space-y-1">
+                {roundPreview.map((entry) => {
+                  const [countPart, typePart] = entry.split('x ');
+                  const bloonType = typePart as BloonColor;
+                  return (
+                    <div key={entry} className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-300">{countPart.trim()} bloons</span>
+                      <span className={`px-2 py-0.5 rounded font-bold ${bloonBadgeColor[bloonType]}`}>{bloonType}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500">No more scripted rounds.</p>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
