@@ -100,40 +100,47 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !engineRef.current) return;
+  const getCanvasCoordinates = useCallback((clientX: number, clientY: number) => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
 
-    if (selectedTowerType) {
-        const success = engineRef.current.placeTower(x, y, selectedTowerType);
-        if (success) {
-            setSelectedTowerType(null);
-            engineRef.current.selectedTowerPlacement = null;
-        }
-    } else {
-        const clickedTower = engineRef.current.towers.find(t => Math.sqrt((t.x - x)**2 + (t.y - y)**2) < 25);
-        if (clickedTower) {
-            setSelectedTowerId(clickedTower.id);
-            engineRef.current.selectedTowerId = clickedTower.id;
-            syncSelectedTowerStats(clickedTower.id);
-        } else {
-            setSelectedTowerId(null);
-            engineRef.current.selectedTowerId = null;
-            syncSelectedTowerStats(null);
-        }
-    }
-  }, [selectedTowerType, syncSelectedTowerStats]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !engineRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    engineRef.current.hoverPos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+    return {
+      x: (clientX - rect.left) * (CANVAS_WIDTH / rect.width),
+      y: (clientY - rect.top) * (CANVAS_HEIGHT / rect.height),
     };
   }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!engineRef.current) return;
+    const coords = getCanvasCoordinates(e.clientX, e.clientY);
+    if (!coords) return;
+
+    if (selectedTowerType) {
+      const success = engineRef.current.placeTower(coords.x, coords.y, selectedTowerType);
+      if (success) {
+        setSelectedTowerType(null);
+        engineRef.current.selectedTowerPlacement = null;
+      }
+    } else {
+      const clickedTower = engineRef.current.towers.find(t => Math.sqrt((t.x - coords.x)**2 + (t.y - coords.y)**2) < 25);
+      if (clickedTower) {
+        setSelectedTowerId(clickedTower.id);
+        engineRef.current.selectedTowerId = clickedTower.id;
+        syncSelectedTowerStats(clickedTower.id);
+      } else {
+        setSelectedTowerId(null);
+        engineRef.current.selectedTowerId = null;
+        syncSelectedTowerStats(null);
+      }
+    }
+  }, [getCanvasCoordinates, selectedTowerType, syncSelectedTowerStats]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!engineRef.current) return;
+    const coords = getCanvasCoordinates(e.clientX, e.clientY);
+    if (!coords) return;
+    engineRef.current.hoverPos = coords;
+  }, [getCanvasCoordinates]);
 
   const startRound = useCallback(() => engineRef.current?.startRound(), []);
   const sellSelectedTower = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } }, [selectedTowerId, syncSelectedTowerStats]);
@@ -162,16 +169,16 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen bg-slate-900 text-white overflow-hidden font-sans">
-      <div className="w-80 bg-slate-800 flex flex-col border-r border-slate-700 shadow-xl z-10">
-        <div className="p-6 bg-slate-900 border-b border-slate-700">
+    <div className="flex h-screen w-screen flex-col-reverse lg:flex-row bg-slate-900 text-white overflow-hidden font-sans">
+      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[45vh] lg:max-h-none">
+        <div className="p-4 lg:p-6 bg-slate-900 border-b border-slate-700">
           <h1 className="text-2xl font-bold text-yellow-400 tracking-tight flex items-center gap-2">
             <Trophy className="w-6 h-6" /> BTD Clone Pro
           </h1>
           <p className="text-slate-400 text-xs mt-1">Advanced Defense Systems</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 p-4 border-b border-slate-700 bg-slate-800/50">
+        <div className="grid grid-cols-2 gap-3 p-3 lg:gap-4 lg:p-4 border-b border-slate-700 bg-slate-800/50">
            <div className="flex items-center gap-2 text-green-400 font-mono text-lg font-bold">
               <DollarSign className="w-5 h-5" /> {Math.floor(money)}
            </div>
@@ -185,7 +192,7 @@ const App: React.FC = () => {
         </div>
 
 
-        <div className="px-4 pb-4 border-b border-slate-700 space-y-3">
+        <div className="px-3 lg:px-4 pb-3 lg:pb-4 border-b border-slate-700 space-y-3">
           <div>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Difficulty</p>
             <div className="grid grid-cols-3 gap-2">
@@ -227,7 +234,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 scrollbar-hide">
           <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Monkey Academy</h2>
           {Object.values(TOWERS).map((tower) => (
             <button
@@ -295,7 +302,7 @@ const App: React.FC = () => {
             </div>
         )}
 
-        <div className="p-4 border-t border-slate-700 bg-slate-900">
+        <div className="p-3 lg:p-4 border-t border-slate-700 bg-slate-900">
           {!isGameOver ? (
             <button
               onClick={startRound}
@@ -312,9 +319,9 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 bg-slate-950 flex items-center justify-center relative overflow-hidden">
+      <div className="flex-1 min-h-0 bg-slate-950 flex items-center justify-center relative overflow-hidden p-2 lg:p-6">
         <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-        <div className="relative shadow-[0_0_100px_rgba(0,0,0,0.8)] rounded-lg overflow-hidden border-4 border-slate-800 bg-slate-900">
+        <div className="relative shadow-[0_0_100px_rgba(0,0,0,0.8)] rounded-lg overflow-hidden border-2 lg:border-4 border-slate-800 bg-slate-900 w-full max-w-[800px]">
             {isGameOver && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
                     <h2 className="text-8xl font-black text-red-600 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)] mb-4 animate-pulse uppercase italic">Defeat</h2>
@@ -326,9 +333,9 @@ const App: React.FC = () => {
               ref={canvasRef}
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
-              onClick={handleCanvasClick}
-              onMouseMove={handleMouseMove}
-              className="cursor-crosshair block"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              className="cursor-crosshair block w-full h-auto touch-none"
             />
             {round === 1 && !isRoundActive && !selectedTowerType && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full text-xs font-bold backdrop-blur-lg pointer-events-none flex items-center gap-3 border border-slate-700 shadow-2xl animate-bounce">
