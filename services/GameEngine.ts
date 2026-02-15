@@ -587,25 +587,39 @@ export class GameEngine {
       const stats = BLOON_STATS[b.type];
       const color = this.getBloonColor(b.type);
 
+      ctx.save();
+      ctx.translate(b.x, b.y);
+
+      if (b.type === BloonColor.MOAB) {
+          const targetNode = PATH_NODES[b.nodeIndex + 1];
+          const currentNode = PATH_NODES[b.nodeIndex];
+          if (targetNode && currentNode) {
+              const angle = Math.atan2(targetNode.y - currentNode.y, targetNode.x - currentNode.x);
+              ctx.rotate(angle);
+          }
+      }
+
       // Knot
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y + stats.r);
-      ctx.lineTo(b.x - 3, b.y + stats.r + 6);
-      ctx.lineTo(b.x + 3, b.y + stats.r + 6);
-      ctx.fill();
+      if (b.type !== BloonColor.MOAB) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(0, stats.r);
+          ctx.lineTo(-3, stats.r + 6);
+          ctx.lineTo(3, stats.r + 6);
+          ctx.fill();
+      }
 
       // Body Gradient
-      const gradient = ctx.createRadialGradient(b.x - stats.r/3, b.y - stats.r/3, stats.r/4, b.x, b.y, stats.r);
+      const gradient = ctx.createRadialGradient(-stats.r/3, -stats.r/3, stats.r/4, 0, 0, stats.r);
       gradient.addColorStop(0, this.lightenColor(color, 50));
       gradient.addColorStop(1, color);
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
       if (b.type === BloonColor.MOAB) {
-          ctx.ellipse(b.x, b.y, stats.r * 1.5, stats.r, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 0, stats.r * 1.5, stats.r, 0, 0, Math.PI * 2);
       } else {
-          ctx.ellipse(b.x, b.y, stats.r * 0.85, stats.r, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 0, stats.r * 0.85, stats.r, 0, 0, Math.PI * 2);
       }
       ctx.fill();
 
@@ -614,13 +628,36 @@ export class GameEngine {
       ctx.lineWidth = 1;
       ctx.stroke();
 
+      if (b.type === BloonColor.MOAB) {
+          // Stripes
+          ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-stats.r * 0.4, -stats.r * 0.8);
+          ctx.lineTo(-stats.r * 0.4, stats.r * 0.8);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(stats.r * 0.4, -stats.r * 0.8);
+          ctx.lineTo(stats.r * 0.4, stats.r * 0.8);
+          ctx.stroke();
+
+          // Fins
+          ctx.fillStyle = '#1d4ed8'; // Slightly darker blue
+          ctx.beginPath();
+          ctx.moveTo(-stats.r * 1.5, 0);
+          ctx.lineTo(-stats.r * 1.8, -stats.r * 0.6);
+          ctx.lineTo(-stats.r * 1.8, stats.r * 0.6);
+          ctx.closePath();
+          ctx.fill();
+      }
+
       if (b.type === BloonColor.Zebra) {
           ctx.strokeStyle = '#f8fafc';
           ctx.lineWidth = 3;
           for (let i = -1; i <= 1; i++) {
               ctx.beginPath();
-              ctx.moveTo(b.x - stats.r * 0.55, b.y + (i * stats.r * 0.35));
-              ctx.lineTo(b.x + stats.r * 0.55, b.y + (i * stats.r * 0.35));
+              ctx.moveTo(-stats.r * 0.55, i * stats.r * 0.35);
+              ctx.lineTo(stats.r * 0.55, i * stats.r * 0.35);
               ctx.stroke();
           }
       }
@@ -629,11 +666,11 @@ export class GameEngine {
           const stripeColors = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'];
           ctx.lineWidth = 2;
           stripeColors.forEach((stripe, idx) => {
-              const y = b.y - stats.r * 0.6 + idx * (stats.r * 0.3);
+              const y = -stats.r * 0.6 + idx * (stats.r * 0.3);
               ctx.strokeStyle = stripe;
               ctx.beginPath();
-              ctx.moveTo(b.x - stats.r * 0.55, y);
-              ctx.lineTo(b.x + stats.r * 0.55, y);
+              ctx.moveTo(-stats.r * 0.55, y);
+              ctx.lineTo(stats.r * 0.55, y);
               ctx.stroke();
           });
       }
@@ -642,7 +679,7 @@ export class GameEngine {
           ctx.strokeStyle = 'rgba(255,255,255,0.4)';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(b.x, b.y, stats.r * 0.55, -Math.PI / 2.5, Math.PI / 2.5);
+          ctx.arc(0, 0, stats.r * 0.55, -Math.PI / 2.5, Math.PI / 2.5);
           ctx.stroke();
       }
 
@@ -651,17 +688,19 @@ export class GameEngine {
           ctx.lineWidth = 2;
           const crackDepth = 1 - (b.health / Math.max(1, stats.health));
           ctx.beginPath();
-          ctx.moveTo(b.x - stats.r * 0.45, b.y - stats.r * 0.25);
-          ctx.lineTo(b.x - stats.r * 0.1, b.y + stats.r * (0.1 + crackDepth * 0.2));
-          ctx.lineTo(b.x + stats.r * 0.3, b.y - stats.r * 0.05);
+          ctx.moveTo(-stats.r * 0.45, -stats.r * 0.25);
+          ctx.lineTo(-stats.r * 0.1, stats.r * (0.1 + crackDepth * 0.2));
+          ctx.lineTo(stats.r * 0.3, -stats.r * 0.05);
           ctx.stroke();
       }
 
       // Shine
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.beginPath();
-      ctx.ellipse(b.x - stats.r * 0.3, b.y - stats.r * 0.3, stats.r * 0.2, stats.r * 0.1, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.ellipse(-stats.r * 0.3, -stats.r * 0.3, stats.r * 0.2, stats.r * 0.1, -Math.PI / 4, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.restore();
   }
 
   private drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
