@@ -493,10 +493,9 @@ const App: React.FC = () => {
             <div
               ref={containerRef}
               data-testid="game-canvas"
-              style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
-              className="cursor-crosshair block w-full h-auto touch-none"
+              className="cursor-crosshair block w-full touch-none aspect-[800/520]"
             >
               <canvas
                 ref={canvasRef}
