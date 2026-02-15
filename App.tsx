@@ -170,7 +170,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen flex-col-reverse lg:flex-row bg-slate-900 text-white overflow-hidden font-sans">
-      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[45vh] lg:max-h-none">
+      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[45vh] lg:max-h-none overflow-y-auto">
         <div className="p-4 lg:p-6 bg-slate-900 border-b border-slate-700">
           <h1 className="text-2xl font-bold text-yellow-400 tracking-tight flex items-center gap-2">
             <Trophy className="w-6 h-6" /> BTD Clone Pro
