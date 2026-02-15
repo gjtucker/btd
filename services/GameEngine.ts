@@ -456,40 +456,37 @@ export class GameEngine {
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Draw Grass Background
-    const gradient = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 0, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH);
-    gradient.addColorStop(0, '#4ADE80');
-    gradient.addColorStop(1, '#22c55e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    // Draw Subtle Grid Pattern
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < CANVAS_WIDTH; x += 40) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
-    }
-    for (let y = 0; y < CANVAS_HEIGHT; y += 40) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
-    }
+    this.drawTerrain(ctx);
 
     // Draw Path Border
-    ctx.strokeStyle = '#a8a29e'; // Stone border color
-    ctx.lineWidth = 48; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#8b7355';
+    ctx.lineWidth = 52; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
     for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
     ctx.stroke();
 
     // Draw Path Road
-    ctx.strokeStyle = '#d6d3d1'; // Light stone path
-    ctx.lineWidth = 40; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const roadGradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    roadGradient.addColorStop(0, '#d3ccbd');
+    roadGradient.addColorStop(0.55, '#c4bcac');
+    roadGradient.addColorStop(1, '#e2dccf');
+    ctx.strokeStyle = roadGradient;
+    ctx.lineWidth = 42; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
     for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
     ctx.stroke();
 
-    // Draw Path Detail (Dashed Line)
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
+    // Draw cobblestone seams
+    ctx.strokeStyle = 'rgba(84, 72, 58, 0.35)';
+    ctx.lineWidth = 2; ctx.setLineDash([7, 8]);
+    ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
+    for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
+    ctx.stroke();
+
+    // Draw worn center strip
+    ctx.strokeStyle = 'rgba(255, 248, 230, 0.32)';
+    ctx.lineWidth = 10;
+    ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(PATH_NODES[0].x, PATH_NODES[0].y);
     for (let i = 1; i < PATH_NODES.length; i++) ctx.lineTo(PATH_NODES[i].x, PATH_NODES[i].y);
     ctx.stroke();
@@ -528,6 +525,43 @@ export class GameEngine {
         ctx.fill();
         ctx.globalAlpha = 1.0;
     });
+  }
+
+  private drawTerrain(ctx: CanvasRenderingContext2D) {
+    const baseGradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    baseGradient.addColorStop(0, '#96c85f');
+    baseGradient.addColorStop(0.5, '#6fab46');
+    baseGradient.addColorStop(1, '#5f8e3b');
+    ctx.fillStyle = baseGradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const sunGlow = ctx.createRadialGradient(120, 40, 10, 120, 40, 300);
+    sunGlow.addColorStop(0, 'rgba(255, 232, 170, 0.35)');
+    sunGlow.addColorStop(1, 'rgba(255, 232, 170, 0)');
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    for (let i = 0; i < 520; i++) {
+      const x = (i * 91) % CANVAS_WIDTH;
+      const y = (i * 67) % CANVAS_HEIGHT;
+      const blade = 2 + (i % 5);
+      ctx.fillStyle = i % 7 === 0 ? 'rgba(133, 178, 73, 0.32)' : 'rgba(58, 111, 41, 0.25)';
+      ctx.fillRect(x, y, blade, 8 + (i % 4));
+    }
+
+    const flowerColors = ['#fdf2f8', '#fef3c7', '#e0f2fe', '#fee2e2'];
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 143 + 37) % CANVAS_WIDTH;
+      const y = (i * 89 + 61) % CANVAS_HEIGHT;
+      if (this.isPointOnPath(x, y, 28)) continue;
+
+      ctx.beginPath();
+      ctx.fillStyle = flowerColors[i % flowerColors.length];
+      ctx.arc(x, y, 1.6 + (i % 2), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(248, 232, 170, 0.75)';
+      ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    }
   }
 
   private drawRangeCircle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
