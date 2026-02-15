@@ -53,10 +53,13 @@ interface Particle {
   vx: number;
   vy: number;
   color: string;
-  life: number;
-  maxLife: number;
+  life: number; // seconds remaining
+  maxLife: number; // seconds total
   size: number;
 }
+
+const SIMULATION_FPS = 60;
+const MIN_EVENT_SPACING_SECONDS = 0.0001;
 
 export class GameEngine {
   bloons: Bloon[] = [];
@@ -230,18 +233,20 @@ export class GameEngine {
       const waveData = WAVES[this.round - 1];
       if (waveData) {
         if (this.waveGroupIndex < waveData.length) {
-           const group = waveData[this.waveGroupIndex];
            this.waveTimer -= dt;
-           if (this.waveTimer <= 0) {
+           while (this.waveGroupIndex < waveData.length && this.waveTimer <= 0) {
+             const group = waveData[this.waveGroupIndex];
              this.spawnWaveBloon(group.type);
              this.waveCountRemaining--;
-             this.waveTimer = group.spacing;
+
              if (this.waveCountRemaining <= 0) {
                this.waveGroupIndex++;
                if (this.waveGroupIndex < waveData.length) {
                  this.waveCountRemaining = waveData[this.waveGroupIndex].count;
-                 this.waveTimer = waveData[this.waveGroupIndex].spacing;
+                 this.waveTimer += Math.max(MIN_EVENT_SPACING_SECONDS, waveData[this.waveGroupIndex].spacing);
                }
+             } else {
+               this.waveTimer += Math.max(MIN_EVENT_SPACING_SECONDS, group.spacing);
              }
            }
         } else if (this.bloons.length === 0) {
@@ -259,43 +264,59 @@ export class GameEngine {
       const b = this.bloons[i];
       const stats = BLOON_STATS[b.type];
       const speed = stats.speed * (this.round > 20 ? 1 + (this.round - 20) * 0.05 : 1);
-      const targetNode = PATH_NODES[b.nodeIndex + 1];
-      const currentNode = PATH_NODES[b.nodeIndex];
-      const dx = targetNode.x - currentNode.x;
-      const dy = targetNode.y - currentNode.y;
-      const totalDist = Math.sqrt(dx*dx + dy*dy);
-      const movement = speed * dt;
-      b.x += (dx / totalDist) * movement;
-      b.y += (dy / totalDist) * movement;
-      b.distanceTraveled += movement;
-      if (Math.sqrt((targetNode.x - b.x)**2 + (targetNode.y - b.y)**2) < movement) {
-        b.nodeIndex++;
-        b.x = targetNode.x; b.y = targetNode.y;
-        if (b.nodeIndex >= PATH_NODES.length - 1) {
-          this.lives -= stats.leakLives;
-          this.bloons.splice(i, 1);
-          this.onStateChange();
+      let movementRemaining = speed * dt;
+
+      while (movementRemaining > 0 && b.nodeIndex < PATH_NODES.length - 1) {
+        const targetNode = PATH_NODES[b.nodeIndex + 1];
+        const dx = targetNode.x - b.x;
+        const dy = targetNode.y - b.y;
+        const distToNode = Math.sqrt(dx * dx + dy * dy);
+
+        if (distToNode <= movementRemaining) {
+          b.x = targetNode.x;
+          b.y = targetNode.y;
+          b.nodeIndex++;
+          b.distanceTraveled += distToNode;
+          movementRemaining -= distToNode;
+
+          if (b.nodeIndex >= PATH_NODES.length - 1) {
+            this.lives -= stats.leakLives;
+            this.bloons.splice(i, 1);
+            this.onStateChange();
+            break;
+          }
+        } else {
+          const moveRatio = movementRemaining / distToNode;
+          b.x += dx * moveRatio;
+          b.y += dy * moveRatio;
+          b.distanceTraveled += movementRemaining;
+          movementRemaining = 0;
         }
       }
     }
 
     this.towers.forEach(tower => {
       tower.cooldownTimer = Math.max(0, tower.cooldownTimer - dt);
-      if (tower.cooldownTimer > 0) return;
+      while (tower.cooldownTimer <= 0) {
+        const cooldownSeconds = Math.max(MIN_EVENT_SPACING_SECONDS, tower.dynamicCooldown / SIMULATION_FPS);
 
-      if (tower.config.id === 'FARM') {
-        this.money += tower.dynamicIncome;
-        tower.totalDamageDealt += tower.dynamicIncome;
-        tower.cooldownTimer = tower.dynamicCooldown / 60;
-        this.createParticle(tower.x, tower.y - 20, '#fde047', 10);
-        this.onStateChange();
-        return;
-      }
+        if (tower.config.id === 'FARM') {
+          this.money += tower.dynamicIncome;
+          tower.totalDamageDealt += tower.dynamicIncome;
+          tower.cooldownTimer += cooldownSeconds;
+          this.createParticle(tower.x, tower.y - 20, '#fde047', 10);
+          this.onStateChange();
+          continue;
+        }
 
-      const target = this.findTarget(tower);
-      if (target) {
+        const target = this.findTarget(tower);
+        if (!target) {
+          tower.cooldownTimer = 0;
+          break;
+        }
+
           this.fire(tower, target);
-          tower.cooldownTimer = tower.dynamicCooldown / 60;
+          tower.cooldownTimer += cooldownSeconds;
       }
     });
 
@@ -324,9 +345,9 @@ export class GameEngine {
     }
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
-        this.particles[i].x += this.particles[i].vx;
-        this.particles[i].y += this.particles[i].vy;
-        this.particles[i].life--;
+        this.particles[i].x += this.particles[i].vx * dt * SIMULATION_FPS;
+        this.particles[i].y += this.particles[i].vy * dt * SIMULATION_FPS;
+        this.particles[i].life -= dt;
         if (this.particles[i].life <= 0) this.particles.splice(i, 1);
     }
   }
@@ -432,7 +453,16 @@ export class GameEngine {
   }
 
   createParticle(x: number, y: number, color: string, size: number) {
-      this.particles.push({ x, y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, color, life: 15, maxLife: 15, size });
+      this.particles.push({
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 5,
+        vy: (Math.random() - 0.5) * 5,
+        color,
+        life: 15 / SIMULATION_FPS,
+        maxLife: 15 / SIMULATION_FPS,
+        size,
+      });
   }
 
   private getBloonColor(type: BloonColor): string {
