@@ -1,4 +1,19 @@
-const NOTE_FREQUENCIES: Record<string, number> = {
+type NoteName =
+  | 'C3'
+  | 'E3'
+  | 'F3'
+  | 'G3'
+  | 'A3'
+  | 'B3'
+  | 'C4'
+  | 'D4'
+  | 'E4'
+  | 'G4'
+  | 'A4';
+
+type PatternNote = NoteName | null;
+
+const NOTE_FREQUENCIES: Record<NoteName, number> = {
   C3: 130.81,
   E3: 164.81,
   F3: 174.61,
@@ -12,12 +27,12 @@ const NOTE_FREQUENCIES: Record<string, number> = {
   A4: 440,
 };
 
-const LEAD_PATTERN: Array<keyof typeof NOTE_FREQUENCIES | null> = [
+const LEAD_PATTERN: PatternNote[] = [
   'E4', null, 'G4', 'A4', null, 'G4', 'E4', 'D4',
   'E4', null, 'G4', 'A4', null, 'B3', 'C4', null,
 ];
 
-const BASS_PATTERN: Array<keyof typeof NOTE_FREQUENCIES | null> = [
+const BASS_PATTERN: PatternNote[] = [
   'C3', null, 'C3', null, 'A3', null, 'A3', null,
   'F3', null, 'F3', null, 'G3', null, 'G3', null,
 ];
@@ -28,19 +43,23 @@ export class MidiBackgroundMusic {
   private intervalId: number | null = null;
   private isMuted = false;
   private currentStep = 0;
+  private nextNoteTime = 0;
 
   private readonly bpm = 132;
   private readonly scheduleAheadTime = 0.2;
   private readonly lookAheadMs = 80;
-  private nextNoteTime = 0;
+  private readonly gainLevel = 0.08;
 
   public start() {
     if (typeof window === 'undefined') return;
 
+    const AudioContextCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
     if (!this.audioContext) {
-      this.audioContext = new window.AudioContext();
+      this.audioContext = new AudioContextCtor();
       this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.value = this.isMuted ? 0 : 0.08;
+      this.masterGain.gain.value = this.isMuted ? 0 : this.gainLevel;
       this.masterGain.connect(this.audioContext.destination);
     }
 
@@ -48,29 +67,49 @@ export class MidiBackgroundMusic {
       void this.audioContext.resume();
     }
 
-    if (this.intervalId !== null) return;
+    if (this.intervalId !== null || this.isMuted) return;
 
     this.nextNoteTime = this.audioContext.currentTime;
     this.intervalId = window.setInterval(() => this.scheduler(), this.lookAheadMs);
   }
 
-  public setMuted(muted: boolean) {
-    this.isMuted = muted;
-    if (this.masterGain) {
-      this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.08, this.audioContext!.currentTime, 0.02);
-    }
-  }
-
-  public dispose() {
+  public stop() {
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
+  }
+
+  public setMuted(muted: boolean) {
+    this.isMuted = muted;
+
+    if (!this.audioContext || !this.masterGain) return;
+
+    this.masterGain.gain.setTargetAtTime(
+      muted ? 0 : this.gainLevel,
+      this.audioContext.currentTime,
+      0.02,
+    );
+
+    if (muted) {
+      this.stop();
+      return;
+    }
+
+    this.start();
+  }
+
+  public dispose() {
+    this.stop();
+
     if (this.audioContext) {
       void this.audioContext.close();
       this.audioContext = null;
       this.masterGain = null;
     }
+
+    this.currentStep = 0;
+    this.nextNoteTime = 0;
   }
 
   private scheduler() {
@@ -90,16 +129,14 @@ export class MidiBackgroundMusic {
   }
 
   private playStep(step: number, time: number) {
-    if (!this.audioContext || !this.masterGain) return;
-
     const leadNote = LEAD_PATTERN[step];
-    const bassNote = BASS_PATTERN[step] ?? null;
+    const bassNote = BASS_PATTERN[step];
 
     if (leadNote) {
       this.playNote(NOTE_FREQUENCIES[leadNote], time, 0.13, 'triangle', 0.55);
     }
 
-    if (bassNote && NOTE_FREQUENCIES[bassNote]) {
+    if (bassNote) {
       this.playNote(NOTE_FREQUENCIES[bassNote], time, 0.18, 'square', 0.3);
     }
   }
