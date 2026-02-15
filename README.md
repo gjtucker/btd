@@ -23,6 +23,8 @@ This repository includes a GitHub Actions workflow that deploys the built `dist/
 
 ### One-time setup
 
+For a step-by-step checklist, see [`docs/GITHUB_PAGES_SETUP.md`](docs/GITHUB_PAGES_SETUP.md).
+
 1. Push this repository to GitHub.
 2. In GitHub, open **Settings → Pages**.
 3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
