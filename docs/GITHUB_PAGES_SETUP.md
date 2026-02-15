@@ -17,7 +17,9 @@ Key points:
 
 - Deploy runs on pushes to `main`.
 - Build output is `dist/`.
-- Build uses a relative Vite `base` (`./`) by default so assets resolve correctly on project pages, user/org pages, and custom domains.
+- Build derives the Vite `base` automatically from `GITHUB_REPOSITORY`.
+  - Project pages (`https://<user>.github.io/<repo>/`) use `/<repo>/`.
+  - User/org pages (`https://<user>.github.io/`) use `/`.
 
 ## 3) Trigger first deployment
 
@@ -35,7 +37,12 @@ After the workflow finishes, your site URL is available in:
 
 If you move to a custom domain, the default relative base usually works unchanged.
 
+- For custom domain roots, base is often `/`.
 - If you need a specific path override, set `BASE_PATH` in the workflow build step.
+
+### User/organization site repo
+
+If the repo name is `<user>.github.io`, deploy URL is root and base path should typically be `/`.
 
 ## 5) Troubleshooting checklist
 
