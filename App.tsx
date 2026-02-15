@@ -159,6 +159,7 @@ const App: React.FC = () => {
     [BloonColor.Zebra]: 'bg-gradient-to-r from-slate-900 to-slate-100 text-black',
     [BloonColor.Rainbow]: 'bg-gradient-to-r from-red-500 via-yellow-400 to-blue-500 text-black',
     [BloonColor.Ceramic]: 'bg-orange-200 text-orange-900',
+    [BloonColor.MOAB]: 'bg-blue-600 text-white',
   };
 
   const selectDifficulty = useCallback((nextDifficulty: GameDifficulty) => {
