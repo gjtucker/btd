@@ -6,6 +6,7 @@ import { BloonColor, GameDifficulty, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
 const MUSIC_ENABLED_STORAGE_KEY = 'btd-music-enabled';
+type MobilePanel = 'build' | 'intel' | 'tower';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,6 +24,7 @@ const App: React.FC = () => {
   const [selectedTowerId, setSelectedTowerId] = useState<number | null>(null);
   const [selectedTowerType, setSelectedTowerType] = useState<TowerConfig | null>(null);
   const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number, isFarm: boolean} | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('build');
   const [roundPreview, setRoundPreview] = useState<string[]>([]);
   const [isMusicEnabled, setIsMusicEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -214,9 +216,91 @@ const App: React.FC = () => {
     setActiveTowerStats(null);
   }, [difficulty]);
 
+  useEffect(() => {
+    if (selectedTowerId !== null && activeTowerStats) {
+      setMobilePanel('tower');
+    }
+  }, [activeTowerStats, selectedTowerId]);
+
+  const towerList = (
+    <>
+      <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Monkey Academy</h2>
+      {Object.values(TOWERS).map((tower) => (
+        <button
+          key={tower.id}
+          onClick={() => { setSelectedTowerType(tower); if(engineRef.current) engineRef.current.selectedTowerPlacement = tower; }}
+          disabled={money < tower.cost}
+          className={`w-full flex items-center p-3 rounded-lg border transition-all duration-200 group ${
+            selectedTowerType?.id === tower.id ? 'bg-blue-600/20 border-blue-500 ring-1 ring-blue-500 shadow-blue-900/40 shadow-inner' : 'bg-slate-700 border-slate-600 hover:bg-slate-600 hover:border-slate-500'
+          } ${money < tower.cost ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800" style={{ backgroundColor: tower.color }}>
+              <span className="text-xs font-bold text-white drop-shadow-md">{tower.id[0]}</span>
+          </div>
+          <div className="ml-3 text-left flex-1">
+            <div className="font-bold text-sm text-slate-100">{tower.name}</div>
+            <div className="text-xs text-yellow-400 font-mono">${tower.cost}</div>
+          </div>
+        </button>
+      ))}
+    </>
+  );
+
+  const selectedTowerCard = selectedTowerId !== null && activeTowerStats && (
+    <div className="p-4 bg-slate-700 border-t border-slate-600 shadow-2xl animate-in slide-in-from-bottom">
+        <div className="flex justify-between items-start mb-3">
+            <h3 className="text-sm font-black text-white uppercase italic">Active Intel</h3>
+            <div className="px-2 py-0.5 bg-slate-800 text-blue-400 text-[10px] rounded font-bold uppercase">{activeTowerStats.isFarm ? 'Support' : activeTowerStats.strategy}</div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="bg-slate-800 p-2 rounded border border-slate-600">
+                <div className="text-[10px] text-slate-400 uppercase">{activeTowerStats.isFarm ? 'Cash Generated' : 'Confirmed Pops'}</div>
+                <div className="text-lg font-mono text-white leading-none">{activeTowerStats.damage}</div>
+            </div>
+            {activeTowerStats.isFarm ? (
+            <div className="bg-slate-800 p-2 rounded border border-slate-600 text-[10px] text-green-300 flex flex-col items-center justify-center gap-1">
+                <DollarSign className="w-3 h-3" /> Passive Income
+            </div>
+            ) : (
+            <button onClick={changeStrategy} className="bg-slate-800 hover:bg-slate-900 p-2 rounded border border-slate-600 text-[10px] text-blue-300 flex flex-col items-center justify-center gap-1 transition-colors">
+                <TrendingUp className="w-3 h-3" /> Change Focus
+            </button>
+            )}
+        </div>
+
+        <div className="space-y-2">
+            {activeTowerStats.currentIdx < activeTowerStats.upgrades.length ? (
+                <div className="bg-slate-900/50 p-3 rounded-lg border border-yellow-500/30">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-yellow-400 flex items-center gap-1"><Zap className="w-3 h-3"/> {activeTowerStats.upgrades[activeTowerStats.currentIdx].name}</span>
+                        <span className="text-xs font-mono text-green-400">${activeTowerStats.upgrades[activeTowerStats.currentIdx].cost}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mb-2 leading-tight">{activeTowerStats.upgrades[activeTowerStats.currentIdx].description}</p>
+                    <button 
+                        onClick={buyUpgrade}
+                        disabled={money < activeTowerStats.upgrades[activeTowerStats.currentIdx].cost}
+                        className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:opacity-50 text-white text-[10px] font-bold py-1.5 rounded uppercase shadow-lg shadow-yellow-900/20 transition-all"
+                    >
+                        Upgrade Now
+                    </button>
+                </div>
+            ) : (
+                <div className="bg-green-900/20 border border-green-500/30 p-2 rounded text-center">
+                    <span className="text-[10px] text-green-400 font-bold uppercase tracking-widest">Maxed Out</span>
+                </div>
+            )}
+        </div>
+
+        <button onClick={sellSelectedTower} className="mt-3 w-full bg-red-900/30 hover:bg-red-900/50 text-red-300 text-[10px] font-bold py-1 rounded border border-red-800/50 transition-colors uppercase">
+            Liquidate Assets
+        </button>
+    </div>
+  );
+
   return (
     <div className="flex h-screen w-screen flex-col-reverse lg:flex-row bg-slate-900 text-white overflow-hidden font-sans">
-      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[45vh] lg:max-h-none overflow-y-auto">
+      <div className="w-full lg:w-80 bg-slate-800 flex flex-col border-t lg:border-t-0 lg:border-r border-slate-700 shadow-xl z-10 max-h-[52vh] lg:max-h-none">
         <div className="p-4 lg:p-6 bg-slate-900 border-b border-slate-700">
           <h1 className="text-2xl font-bold text-yellow-400 tracking-tight flex items-center gap-2">
             <Trophy className="w-6 h-6" /> BTD Clone Pro
@@ -297,80 +381,45 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 scrollbar-hide">
-          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Monkey Academy</h2>
-          {Object.values(TOWERS).map((tower) => (
-            <button
-              key={tower.id}
-              onClick={() => { setSelectedTowerType(tower); if(engineRef.current) engineRef.current.selectedTowerPlacement = tower; }}
-              disabled={money < tower.cost}
-              className={`w-full flex items-center p-3 rounded-lg border transition-all duration-200 group ${
-                selectedTowerType?.id === tower.id ? 'bg-blue-600/20 border-blue-500 ring-1 ring-blue-500 shadow-blue-900/40 shadow-inner' : 'bg-slate-700 border-slate-600 hover:bg-slate-600 hover:border-slate-500'
-              } ${money < tower.cost ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800" style={{ backgroundColor: tower.color }}>
-                 <span className="text-xs font-bold text-white drop-shadow-md">{tower.id[0]}</span>
-              </div>
-              <div className="ml-3 text-left flex-1">
-                <div className="font-bold text-sm text-slate-100">{tower.name}</div>
-                <div className="text-xs text-yellow-400 font-mono">${tower.cost}</div>
-              </div>
-            </button>
-          ))}
+        <div className="lg:hidden px-3 py-2 border-b border-slate-700 bg-slate-900/60">
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { id: 'build', label: 'Build' },
+              { id: 'intel', label: 'Intel' },
+              { id: 'tower', label: 'Tower' },
+            ] as const).map((panel) => (
+              <button
+                key={panel.id}
+                onClick={() => setMobilePanel(panel.id)}
+                className={`rounded-md border py-2 text-xs font-bold uppercase tracking-wide transition-colors ${mobilePanel === panel.id ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300'}`}
+              >
+                {panel.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <div className="hidden lg:block flex-1 overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 scrollbar-hide">
+          {towerList}
+        </div>
+
+        <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-3">
+          {mobilePanel === 'build' && <div className="space-y-2">{towerList}</div>}
+          {mobilePanel === 'intel' && (
+            <p className="text-xs text-slate-300 bg-slate-900/70 border border-slate-700 rounded-lg p-3">
+              Difficulty, music controls, and next-round intel are shown above. Use this space for quick status checks while keeping scroll targets larger on small screens.
+            </p>
+          )}
+          {mobilePanel === 'tower' && (
+            selectedTowerCard ?? <p className="text-xs text-slate-400 bg-slate-900/70 border border-slate-700 rounded-lg p-3">Select a placed tower to manage upgrades and targeting here.</p>
+          )}
+        </div>
+
+        <div className="hidden lg:block">
+          {selectedTowerCard}
+        </div>
+
         
-        {selectedTowerId !== null && activeTowerStats && (
-            <div className="p-4 bg-slate-700 border-t border-slate-600 shadow-2xl animate-in slide-in-from-bottom">
-                <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-sm font-black text-white uppercase italic">Active Intel</h3>
-                    <div className="px-2 py-0.5 bg-slate-800 text-blue-400 text-[10px] rounded font-bold uppercase">{activeTowerStats.isFarm ? 'Support' : activeTowerStats.strategy}</div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="bg-slate-800 p-2 rounded border border-slate-600">
-                        <div className="text-[10px] text-slate-400 uppercase">{activeTowerStats.isFarm ? 'Cash Generated' : 'Confirmed Pops'}</div>
-                        <div className="text-lg font-mono text-white leading-none">{activeTowerStats.damage}</div>
-                    </div>
-                    {activeTowerStats.isFarm ? (
-                    <div className="bg-slate-800 p-2 rounded border border-slate-600 text-[10px] text-green-300 flex flex-col items-center justify-center gap-1">
-                        <DollarSign className="w-3 h-3" /> Passive Income
-                    </div>
-                    ) : (
-                    <button onClick={changeStrategy} className="bg-slate-800 hover:bg-slate-900 p-2 rounded border border-slate-600 text-[10px] text-blue-300 flex flex-col items-center justify-center gap-1 transition-colors">
-                        <TrendingUp className="w-3 h-3" /> Change Focus
-                    </button>
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                    {activeTowerStats.currentIdx < activeTowerStats.upgrades.length ? (
-                        <div className="bg-slate-900/50 p-3 rounded-lg border border-yellow-500/30">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs font-bold text-yellow-400 flex items-center gap-1"><Zap className="w-3 h-3"/> {activeTowerStats.upgrades[activeTowerStats.currentIdx].name}</span>
-                                <span className="text-xs font-mono text-green-400">${activeTowerStats.upgrades[activeTowerStats.currentIdx].cost}</span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 mb-2 leading-tight">{activeTowerStats.upgrades[activeTowerStats.currentIdx].description}</p>
-                            <button 
-                                onClick={buyUpgrade}
-                                disabled={money < activeTowerStats.upgrades[activeTowerStats.currentIdx].cost}
-                                className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:opacity-50 text-white text-[10px] font-bold py-1.5 rounded uppercase shadow-lg shadow-yellow-900/20 transition-all"
-                            >
-                                Upgrade Now
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="bg-green-900/20 border border-green-500/30 p-2 rounded text-center">
-                            <span className="text-[10px] text-green-400 font-bold uppercase tracking-widest">Maxed Out</span>
-                        </div>
-                    )}
-                </div>
-
-                <button onClick={sellSelectedTower} className="mt-3 w-full bg-red-900/30 hover:bg-red-900/50 text-red-300 text-[10px] font-bold py-1 rounded border border-red-800/50 transition-colors uppercase">
-                    Liquidate Assets
-                </button>
-            </div>
-        )}
-
         <div className="p-3 lg:p-4 border-t border-slate-700 bg-slate-900">
           {!isGameOver ? (
             <button
@@ -417,7 +466,7 @@ const App: React.FC = () => {
                     Deploying {selectedTowerType.name}
                 </div>
              )}
-        </div>
+            </div>
       </div>
     </div>
   );
