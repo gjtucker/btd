@@ -157,6 +157,23 @@ export const TOWERS: Record<string, TowerConfig> = {
       { name: 'Epic Range', description: '+100 range', cost: 1500, effect: { range: 100 } },
     ],
   },
+  FARM: {
+    id: 'FARM',
+    name: 'Banana Farm',
+    cost: 1000,
+    range: 0,
+    damage: 0,
+    cooldown: 360,
+    pierce: 0,
+    projectileSpeed: 0,
+    damageType: DamageType.Sharp,
+    color: '#facc15',
+    income: 80,
+    upgrades: [
+      { name: 'More Bananas', description: '+60 cash per harvest', cost: 700, effect: { income: 60 } },
+      { name: 'Banana Plantation', description: '+120 cash per harvest', cost: 1400, effect: { income: 120 } },
+    ],
+  },
 };
 
 export const WAVES: Wave[] = [

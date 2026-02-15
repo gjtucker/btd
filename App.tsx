@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [selectedTowerId, setSelectedTowerId] = useState<number | null>(null);
   const [selectedTowerType, setSelectedTowerType] = useState<TowerConfig | null>(null);
-  const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number} | null>(null);
+  const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number, isFarm: boolean} | null>(null);
   const [roundPreview, setRoundPreview] = useState<string[]>([]);
 
   const updateStats = useCallback(() => {
@@ -40,7 +40,8 @@ const App: React.FC = () => {
                   damage: t.totalDamageDealt,
                   strategy: t.strategy,
                   upgrades: t.config.upgrades,
-                  currentIdx: t.currentUpgrades
+                  currentIdx: t.currentUpgrades,
+                  isFarm: t.config.id === 'FARM'
               });
           } else {
               setSelectedTowerId(null);
@@ -97,6 +98,7 @@ const App: React.FC = () => {
       strategy: tower.strategy,
       upgrades: tower.config.upgrades,
       currentIdx: tower.currentUpgrades,
+      isFarm: tower.config.id === 'FARM',
     });
   }, []);
 
@@ -270,17 +272,23 @@ const App: React.FC = () => {
             <div className="p-4 bg-slate-700 border-t border-slate-600 shadow-2xl animate-in slide-in-from-bottom">
                 <div className="flex justify-between items-start mb-3">
                     <h3 className="text-sm font-black text-white uppercase italic">Active Intel</h3>
-                    <div className="px-2 py-0.5 bg-slate-800 text-blue-400 text-[10px] rounded font-bold uppercase">{activeTowerStats.strategy}</div>
+                    <div className="px-2 py-0.5 bg-slate-800 text-blue-400 text-[10px] rounded font-bold uppercase">{activeTowerStats.isFarm ? 'Support' : activeTowerStats.strategy}</div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 mb-4">
                     <div className="bg-slate-800 p-2 rounded border border-slate-600">
-                        <div className="text-[10px] text-slate-400 uppercase">Confirmed Pops</div>
+                        <div className="text-[10px] text-slate-400 uppercase">{activeTowerStats.isFarm ? 'Cash Generated' : 'Confirmed Pops'}</div>
                         <div className="text-lg font-mono text-white leading-none">{activeTowerStats.damage}</div>
                     </div>
+                    {activeTowerStats.isFarm ? (
+                    <div className="bg-slate-800 p-2 rounded border border-slate-600 text-[10px] text-green-300 flex flex-col items-center justify-center gap-1">
+                        <DollarSign className="w-3 h-3" /> Passive Income
+                    </div>
+                    ) : (
                     <button onClick={changeStrategy} className="bg-slate-800 hover:bg-slate-900 p-2 rounded border border-slate-600 text-[10px] text-blue-300 flex flex-col items-center justify-center gap-1 transition-colors">
                         <TrendingUp className="w-3 h-3" /> Change Focus
                     </button>
+                    )}
                 </div>
 
                 <div className="space-y-2">

@@ -45,6 +45,7 @@ export interface Upgrade {
     cooldownMult?: number;
     pierce?: number;
     projectileSpeed?: number;
+    income?: number;
   };
 }
 
@@ -59,6 +60,7 @@ export interface TowerConfig {
   projectileSpeed: number; // 0 for hitscan
   damageType: DamageType;
   color: string;
+  income?: number;
   upgrades: Upgrade[];
 }
 
