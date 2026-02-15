@@ -31,4 +31,21 @@ This repository includes a GitHub Actions workflow that deploys the built `dist/
 ### Notes
 
 - For project pages (`https://<user>.github.io/<repo>/`), the workflow builds with the correct base path automatically.
-- If you later use a custom domain or user/organization pages root, you can adjust the `--base` argument in `.github/workflows/deploy-pages.yml`.
+- If you later use a custom domain or user/organization pages root, you can adjust the `BASE_PATH` value in `.github/workflows/deploy-pages.yml`.
+
+### Troubleshooting GitHub Pages
+
+- Ensure the repository is **Public** (recommended for easiest GitHub Pages setup) and that **Settings → Pages → Source** is set to **GitHub Actions**.
+- Confirm the deploy workflow runs on pushes to `main`.
+- If the site loads but has missing assets, verify `BASE_PATH` in `.github/workflows/deploy-pages.yml` matches your repository name.
+
+## Checking git history for sensitive data
+
+Before making a repository public, scan all commits for obvious secrets:
+
+```bash
+git rev-list --all > /tmp/all_revs.txt
+git grep -n -I -E '(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\-_]{35}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{80,}|-----BEGIN (RSA|EC|OPENSSH|DSA|PGP) PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}|[Pp]assword\s*[:=]\s*[^\s]+|[Aa]pi[_-]?[Kk]ey\s*[:=]\s*[^\s]+|[Ss]ecret\s*[:=]\s*[^\s]+)' $(cat /tmp/all_revs.txt)
+```
+
+No output means no matches for those common secret patterns.
