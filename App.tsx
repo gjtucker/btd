@@ -8,7 +8,7 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const requestRef = useRef<number>();
-  const [lastTime, setLastTime] = useState(0);
+  const lastTimeRef = useRef<number>(0);
 
   const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.Medium);
   const [money, setMoney] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
@@ -50,12 +50,18 @@ const App: React.FC = () => {
     }
   }, [selectedTowerId]);
 
+  const updateStatsRef = useRef(updateStats);
   useEffect(() => {
-    const engine = new GameEngine(updateStats, difficulty);
+    updateStatsRef.current = updateStats;
+  }, [updateStats]);
+
+  useEffect(() => {
+    const engine = new GameEngine(() => updateStatsRef.current(), difficulty);
     engineRef.current = engine;
-    updateStats();
+    updateStatsRef.current();
+
     const animate = (time: number) => {
-      const dt = (time - lastTime) / 1000;
+      const dt = (time - lastTimeRef.current) / 1000;
       const safeDt = Math.min(dt, 0.1); 
       if (engineRef.current) {
         engineRef.current.update(safeDt);
@@ -64,12 +70,12 @@ const App: React.FC = () => {
           if (ctx) engineRef.current.draw(ctx);
         }
       }
-      setLastTime(time);
+      lastTimeRef.current = time;
       requestRef.current = requestAnimationFrame(animate);
     };
     requestRef.current = requestAnimationFrame(animate);
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-  }, [updateStats, difficulty]);
+  }, [difficulty]);
 
   const syncSelectedTowerStats = useCallback((towerId: number | null) => {
     if (!engineRef.current || towerId === null) {
@@ -94,7 +100,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !engineRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -118,21 +124,21 @@ const App: React.FC = () => {
             syncSelectedTowerStats(null);
         }
     }
-  };
+  }, [selectedTowerType, syncSelectedTowerStats]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !engineRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     engineRef.current.hoverPos = {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
     };
-  };
+  }, []);
 
-  const startRound = () => engineRef.current?.startRound();
-  const sellSelectedTower = () => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } };
-  const changeStrategy = () => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } };
-  const buyUpgrade = () => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } };
+  const startRound = useCallback(() => engineRef.current?.startRound(), []);
+  const sellSelectedTower = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } }, [selectedTowerId, syncSelectedTowerStats]);
+  const changeStrategy = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
+  const buyUpgrade = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
 
   const bloonBadgeColor: Record<BloonColor, string> = {
     [BloonColor.Red]: 'bg-red-500',
@@ -148,12 +154,12 @@ const App: React.FC = () => {
     [BloonColor.Ceramic]: 'bg-orange-200 text-orange-900',
   };
 
-  const selectDifficulty = (nextDifficulty: GameDifficulty) => {
+  const selectDifficulty = useCallback((nextDifficulty: GameDifficulty) => {
     setDifficulty(nextDifficulty);
     setSelectedTowerId(null);
     setSelectedTowerType(null);
     setActiveTowerStats(null);
-  };
+  }, []);
 
   return (
     <div className="flex h-screen w-screen bg-slate-900 text-white overflow-hidden font-sans">
