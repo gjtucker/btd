@@ -51,15 +51,15 @@ export class ThreeRenderer {
   }
 
   private drawMap(map: GameMap) {
-    this.ctx.fillStyle = map.theme.terrainDark;
+    this.ctx.fillStyle = map.theme.terrainEnd;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     const top = this.project(0, 0).y;
     const bottom = this.project(0, CANVAS_HEIGHT).y;
     const gradient = this.ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, map.theme.terrainLight);
+    gradient.addColorStop(0, map.theme.terrainStart);
     gradient.addColorStop(0.45, map.theme.terrainMid);
-    gradient.addColorStop(1, map.theme.terrainDark);
+    gradient.addColorStop(1, map.theme.terrainEnd);
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, top, CANVAS_WIDTH, bottom - top);
 
@@ -77,7 +77,7 @@ export class ThreeRenderer {
     }
     this.ctx.stroke();
 
-    this.ctx.strokeStyle = map.theme.pathDark;
+    this.ctx.strokeStyle = map.theme.pathBorder;
     this.ctx.lineWidth = 42;
     this.ctx.beginPath();
     this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y);
@@ -86,7 +86,7 @@ export class ThreeRenderer {
     }
     this.ctx.stroke();
 
-    this.ctx.strokeStyle = map.theme.pathLight;
+    this.ctx.strokeStyle = map.theme.pathStart;
     this.ctx.lineWidth = 22;
     this.ctx.beginPath();
     this.ctx.moveTo(projectedNodes[0].x, projectedNodes[0].y - 1);
