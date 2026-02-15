@@ -55,6 +55,8 @@ export const BLOON_STATS: Record<BloonColor, BloonLayer> = {
   [BloonColor.White]: { color: BloonColor.White, health: 1, speed: 180, children: [BloonColor.Pink], childCount: 2, immunities: [DamageType.Freeze], r: 14, money: 1, leakLives: 2 },
   [BloonColor.Lead]: { color: BloonColor.Lead, health: 1, speed: 72, children: [BloonColor.Black], childCount: 2, immunities: [DamageType.Sharp], r: 16, money: 1, leakLives: 3 },
   [BloonColor.Zebra]: { color: BloonColor.Zebra, health: 1, speed: 216, children: [BloonColor.Black, BloonColor.White], childCount: 1, immunities: [], r: 15, money: 1, leakLives: 3 },
+  [BloonColor.Rainbow]: { color: BloonColor.Rainbow, health: 1, speed: 228, children: [BloonColor.Zebra], childCount: 2, immunities: [], r: 16, money: 1, leakLives: 4 },
+  [BloonColor.Ceramic]: { color: BloonColor.Ceramic, health: 10, speed: 180, children: [BloonColor.Rainbow], childCount: 2, immunities: [], r: 18, money: 2, leakLives: 10 },
 };
 
 export const TOWERS: Record<string, TowerConfig> = {
@@ -188,8 +190,8 @@ export const WAVES: Wave[] = [
   [{ type: BloonColor.Black, count: 35, spacing: 0.07 }, { type: BloonColor.White, count: 35, spacing: 0.07 }],
   [{ type: BloonColor.Pink, count: 50, spacing: 0.05 }, { type: BloonColor.Black, count: 25, spacing: 0.08 }, { type: BloonColor.White, count: 25, spacing: 0.08 }],
   [{ type: BloonColor.Lead, count: 14, spacing: 0.3 }, { type: BloonColor.Black, count: 20, spacing: 0.1 }],
-  [{ type: BloonColor.Zebra, count: 20, spacing: 0.18 }, { type: BloonColor.Pink, count: 25, spacing: 0.08 }],
-  [{ type: BloonColor.Lead, count: 24, spacing: 0.18 }, { type: BloonColor.Zebra, count: 16, spacing: 0.16 }],
-  [{ type: BloonColor.Zebra, count: 36, spacing: 0.1 }, { type: BloonColor.Black, count: 36, spacing: 0.08 }],
-  [{ type: BloonColor.Lead, count: 20, spacing: 0.12 }, { type: BloonColor.Zebra, count: 40, spacing: 0.08 }, { type: BloonColor.Pink, count: 40, spacing: 0.06 }],
+  [{ type: BloonColor.Zebra, count: 20, spacing: 0.18 }, { type: BloonColor.Pink, count: 25, spacing: 0.08 }, { type: BloonColor.Rainbow, count: 10, spacing: 0.2 }],
+  [{ type: BloonColor.Lead, count: 24, spacing: 0.18 }, { type: BloonColor.Zebra, count: 16, spacing: 0.16 }, { type: BloonColor.Rainbow, count: 12, spacing: 0.12 }],
+  [{ type: BloonColor.Zebra, count: 36, spacing: 0.1 }, { type: BloonColor.Black, count: 36, spacing: 0.08 }, { type: BloonColor.Ceramic, count: 8, spacing: 0.25 }],
+  [{ type: BloonColor.Lead, count: 20, spacing: 0.12 }, { type: BloonColor.Zebra, count: 40, spacing: 0.08 }, { type: BloonColor.Pink, count: 40, spacing: 0.06 }, { type: BloonColor.Ceramic, count: 12, spacing: 0.2 }],
 ];
