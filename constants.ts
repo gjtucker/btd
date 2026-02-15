@@ -74,7 +74,8 @@ export const TOWERS: Record<string, TowerConfig> = {
     color: '#8B5A2B',
     upgrades: [
       { name: 'Sharp Shots', description: '+2 pierce', cost: 140, effect: { pierce: 2 } },
-      { name: 'Very Quick Shots', description: 'Attack 50% faster', cost: 200, effect: { cooldownMult: 0.5 } },
+      { name: 'Very Quick Shots', description: 'Attack 35% faster', cost: 200, effect: { cooldownMult: 0.65 } },
+      { name: 'Razor Darts', description: '+1 damage and +1 pierce', cost: 380, effect: { damage: 1, pierce: 1 } },
     ],
   },
   TACK: {
@@ -91,6 +92,7 @@ export const TOWERS: Record<string, TowerConfig> = {
     upgrades: [
       { name: 'Fast Tacks', description: 'Faster shots', cost: 210, effect: { cooldownMult: 0.7 } },
       { name: 'Extra Range Tacks', description: '+30 range', cost: 300, effect: { range: 30 } },
+      { name: 'Blade Shooter', description: '+1 damage and +2 pierce', cost: 700, effect: { damage: 1, pierce: 2 } },
     ],
   },
   CANNON: {
@@ -107,22 +109,41 @@ export const TOWERS: Record<string, TowerConfig> = {
     upgrades: [
       { name: 'Bigger Bombs', description: '+1 damage', cost: 400, effect: { damage: 1 } },
       { name: 'Missile Launcher', description: 'Faster missiles', cost: 500, effect: { projectileSpeed: 5 } },
+      { name: 'Heavy Shells', description: '+1 damage, +2 pierce', cost: 950, effect: { damage: 1, pierce: 2 } },
+    ],
+  },
+  ICE: {
+    id: 'ICE',
+    name: 'Ice Monkey',
+    cost: 350,
+    range: 130,
+    damage: 1,
+    cooldown: 55,
+    pierce: 2,
+    projectileSpeed: 11,
+    damageType: DamageType.Freeze,
+    color: '#7dd3fc',
+    upgrades: [
+      { name: 'Permafrost', description: '+25 range', cost: 220, effect: { range: 25 } },
+      { name: 'Deep Freeze', description: '+1 damage and +1 pierce', cost: 380, effect: { damage: 1, pierce: 1 } },
+      { name: 'Arctic Wind', description: 'Attack 25% faster', cost: 650, effect: { cooldownMult: 0.75 } },
     ],
   },
   SNIPER: {
     id: 'SNIPER',
     name: 'Sniper Monkey',
-    cost: 450, // Buffed cost
+    cost: 450,
     range: 2000,
-    damage: 2, // High damage
+    damage: 2,
     cooldown: 100,
     pierce: 1,
-    projectileSpeed: 0, // 0 = Hitscan
+    projectileSpeed: 0,
     damageType: DamageType.Sharp,
     color: '#556B2F',
     upgrades: [
       { name: 'Full Metal Jacket', description: '+2 damage', cost: 350, effect: { damage: 2 } },
-      { name: 'Faster Firing', description: 'Fire faster', cost: 400, effect: { cooldownMult: 0.7 } },
+      { name: 'Faster Firing', description: 'Fire 30% faster', cost: 400, effect: { cooldownMult: 0.7 } },
+      { name: 'Large Calibre', description: '+2 damage', cost: 900, effect: { damage: 2 } },
     ],
   },
   WIZARD: {
@@ -138,7 +159,8 @@ export const TOWERS: Record<string, TowerConfig> = {
     color: '#4B0082',
     upgrades: [
       { name: 'Intense Magic', description: '+2 pierce', cost: 300, effect: { pierce: 2 } },
-      { name: 'Fireball', description: 'Huge explosion dmg', cost: 550, effect: { damage: 2 } },
+      { name: 'Dragon Breath', description: '+1 damage and faster cast rate', cost: 550, effect: { damage: 1, cooldownMult: 0.75 } },
+      { name: 'Arcane Power', description: '+1 damage and +2 pierce', cost: 1000, effect: { damage: 1, pierce: 2 } },
     ],
   },
   SUPER: {
@@ -147,14 +169,15 @@ export const TOWERS: Record<string, TowerConfig> = {
     cost: 2500,
     range: 250,
     damage: 1,
-    cooldown: 3, // Insanely fast
+    cooldown: 3,
     pierce: 1,
     projectileSpeed: 20,
     damageType: DamageType.Sharp,
     color: '#FFFF00',
     upgrades: [
-      { name: 'Laser Blasts', description: '+1 dmg, magic type', cost: 2500, effect: { damage: 1 } },
+      { name: 'Laser Blasts', description: '+1 damage and magical projectiles', cost: 2500, effect: { damage: 1, damageType: DamageType.Magic } },
       { name: 'Epic Range', description: '+100 range', cost: 1500, effect: { range: 100 } },
+      { name: 'Sun Focused', description: '+1 damage and +3 pierce', cost: 5000, effect: { damage: 1, pierce: 3 } },
     ],
   },
   FARM: {
@@ -172,6 +195,7 @@ export const TOWERS: Record<string, TowerConfig> = {
     upgrades: [
       { name: 'More Bananas', description: '+60 cash per harvest', cost: 700, effect: { income: 60 } },
       { name: 'Banana Plantation', description: '+120 cash per harvest', cost: 1400, effect: { income: 120 } },
+      { name: 'Monkey Bank', description: '+220 cash per harvest', cost: 3200, effect: { income: 220 } },
     ],
   },
 };
@@ -213,4 +237,13 @@ export const WAVES: Wave[] = [
   [{ type: BloonColor.Zebra, count: 36, spacing: 0.1 }, { type: BloonColor.Black, count: 36, spacing: 0.08 }, { type: BloonColor.Ceramic, count: 8, spacing: 0.25 }],
   [{ type: BloonColor.Lead, count: 20, spacing: 0.12 }, { type: BloonColor.Zebra, count: 40, spacing: 0.08 }, { type: BloonColor.Pink, count: 40, spacing: 0.06 }, { type: BloonColor.Ceramic, count: 12, spacing: 0.2 }],
   [{ type: BloonColor.MOAB, count: 1, spacing: 1.0 }],
+  [{ type: BloonColor.Ceramic, count: 20, spacing: 0.16 }, { type: BloonColor.Rainbow, count: 45, spacing: 0.08 }],
+  [{ type: BloonColor.MOAB, count: 1, spacing: 1.0 }, { type: BloonColor.Ceramic, count: 10, spacing: 0.2 }],
+  [{ type: BloonColor.Lead, count: 40, spacing: 0.08 }, { type: BloonColor.Ceramic, count: 18, spacing: 0.16 }],
+  [{ type: BloonColor.Zebra, count: 70, spacing: 0.05 }, { type: BloonColor.Rainbow, count: 35, spacing: 0.08 }],
+  [{ type: BloonColor.MOAB, count: 2, spacing: 0.9 }],
+  [{ type: BloonColor.Ceramic, count: 45, spacing: 0.08 }, { type: BloonColor.MOAB, count: 1, spacing: 1.1 }],
+  [{ type: BloonColor.Lead, count: 70, spacing: 0.05 }, { type: BloonColor.Zebra, count: 60, spacing: 0.06 }],
+  [{ type: BloonColor.MOAB, count: 3, spacing: 0.8 }, { type: BloonColor.Ceramic, count: 30, spacing: 0.1 }],
+  [{ type: BloonColor.Ceramic, count: 80, spacing: 0.06 }, { type: BloonColor.Rainbow, count: 120, spacing: 0.04 }],
 ];
