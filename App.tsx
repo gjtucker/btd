@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
+import { ThreeRenderer } from './services/ThreeRenderer';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
 import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, TOWERS } from './constants';
 import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
@@ -9,8 +10,9 @@ const MUSIC_ENABLED_STORAGE_KEY = 'btd-music-enabled';
 type MobilePanel = 'build' | 'intel' | 'tower';
 
 const App: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const threeRendererRef = useRef<ThreeRenderer | null>(null);
   const requestRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
   const midiRef = useRef<MidiBackgroundMusic | null>(null);
@@ -94,21 +96,34 @@ const App: React.FC = () => {
     engineRef.current = engine;
     updateStatsRef.current();
 
+    if (containerRef.current && !threeRendererRef.current) {
+        threeRendererRef.current = new ThreeRenderer(containerRef.current);
+    }
+
+    if (threeRendererRef.current) {
+        threeRendererRef.current.initScene(MAPS[mapId]);
+    }
+
     const animate = (time: number) => {
       const dt = (time - lastTimeRef.current) / 1000;
       const safeDt = Math.min(dt, 0.1); 
       if (engineRef.current) {
         engineRef.current.update(safeDt);
-        if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          if (ctx) engineRef.current.draw(ctx);
+        if (threeRendererRef.current) {
+          threeRendererRef.current.render(engineRef.current);
         }
       }
       lastTimeRef.current = time;
       requestRef.current = requestAnimationFrame(animate);
     };
     requestRef.current = requestAnimationFrame(animate);
-    return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+    return () => {
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        if (threeRendererRef.current) {
+            threeRendererRef.current.dispose();
+            threeRendererRef.current = null;
+        }
+    };
   }, [difficulty, mapId]);
 
   const syncSelectedTowerStats = useCallback((towerId: number | null) => {
@@ -135,9 +150,9 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const getCanvasCoordinates = useCallback((clientX: number, clientY: number) => {
-    if (!canvasRef.current) return null;
-    const rect = canvasRef.current.getBoundingClientRect();
+  const getGameCoordinates = useCallback((clientX: number, clientY: number) => {
+    if (!containerRef.current) return null;
+    const rect = containerRef.current.getBoundingClientRect();
 
     return {
       x: (clientX - rect.left) * (CANVAS_WIDTH / rect.width),
@@ -145,10 +160,10 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!engineRef.current) return;
     if (isMusicEnabled) midiRef.current?.start();
-    const coords = getCanvasCoordinates(e.clientX, e.clientY);
+    const coords = getGameCoordinates(e.clientX, e.clientY);
     if (!coords) return;
 
     if (selectedTowerType) {
@@ -169,14 +184,14 @@ const App: React.FC = () => {
         syncSelectedTowerStats(null);
       }
     }
-  }, [getCanvasCoordinates, isMusicEnabled, selectedTowerType, syncSelectedTowerStats]);
+  }, [getGameCoordinates, isMusicEnabled, selectedTowerType, syncSelectedTowerStats]);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!engineRef.current) return;
-    const coords = getCanvasCoordinates(e.clientX, e.clientY);
+    const coords = getGameCoordinates(e.clientX, e.clientY);
     if (!coords) return;
     engineRef.current.hoverPos = coords;
-  }, [getCanvasCoordinates]);
+  }, [getGameCoordinates]);
 
   const startRound = useCallback(() => {
     if (isMusicEnabled) midiRef.current?.start();
@@ -485,10 +500,9 @@ const App: React.FC = () => {
                     <button onClick={() => window.location.reload()} className="mt-8 px-8 py-3 bg-red-600 text-white font-black rounded uppercase hover:bg-red-500 transition-colors">Return to Base</button>
                 </div>
             )}
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
+            <div
+              ref={containerRef}
+              style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               className="cursor-crosshair block w-full h-auto touch-none"
