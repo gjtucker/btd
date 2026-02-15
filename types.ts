@@ -94,6 +94,28 @@ export interface Point {
   y: number;
 }
 
+export type GameMapId = 'CLASSIC_LOOP' | 'RIVER_BEND' | 'QUARRY_RUN';
+
+export interface MapTheme {
+  terrainStart: string;
+  terrainMid: string;
+  terrainEnd: string;
+  pathBorder: string;
+  pathStart: string;
+  pathMid: string;
+  pathEnd: string;
+  seamColor: string;
+  stripColor: string;
+}
+
+export interface GameMap {
+  id: GameMapId;
+  label: string;
+  description: string;
+  nodes: Point[];
+  theme: MapTheme;
+}
+
 export interface WaveGroup {
   type: BloonColor;
   count: number;

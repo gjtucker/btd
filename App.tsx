@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
-import { CANVAS_HEIGHT, CANVAS_WIDTH, DIFFICULTY_PRESETS, TOWERS } from './constants';
-import { BloonColor, GameDifficulty, TowerConfig, Upgrade } from './types';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, TOWERS } from './constants';
+import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
 const MUSIC_ENABLED_STORAGE_KEY = 'btd-music-enabled';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const midiRef = useRef<MidiBackgroundMusic | null>(null);
 
   const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.Medium);
+  const [mapId, setMapId] = useState<GameMapId>(DEFAULT_MAP_ID);
   const [money, setMoney] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
   const [lives, setLives] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingLives);
   const [round, setRound] = useState(1);
@@ -89,7 +90,7 @@ const App: React.FC = () => {
   }, [isMusicEnabled]);
 
   useEffect(() => {
-    const engine = new GameEngine(() => updateStatsRef.current(), difficulty);
+    const engine = new GameEngine(() => updateStatsRef.current(), difficulty, mapId);
     engineRef.current = engine;
     updateStatsRef.current();
 
@@ -108,7 +109,7 @@ const App: React.FC = () => {
     };
     requestRef.current = requestAnimationFrame(animate);
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-  }, [difficulty]);
+  }, [difficulty, mapId]);
 
   const syncSelectedTowerStats = useCallback((towerId: number | null) => {
     if (!engineRef.current || towerId === null) {
@@ -215,6 +216,22 @@ const App: React.FC = () => {
     setSelectedTowerType(null);
     setActiveTowerStats(null);
   }, [difficulty]);
+
+  const selectMap = useCallback((nextMapId: GameMapId) => {
+    if (nextMapId === mapId) {
+      return;
+    }
+
+    const confirmed = window.confirm('Changing maps will reset your current game. Continue?');
+    if (!confirmed) {
+      return;
+    }
+
+    setMapId(nextMapId);
+    setSelectedTowerId(null);
+    setSelectedTowerType(null);
+    setActiveTowerStats(null);
+  }, [mapId]);
 
   useEffect(() => {
     if (selectedTowerId !== null && activeTowerStats) {
@@ -338,6 +355,27 @@ const App: React.FC = () => {
                   } ${isRoundActive ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {DIFFICULTY_PRESETS[mode].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Map</p>
+            <div className="space-y-2">
+              {Object.values(MAPS).map((map) => (
+                <button
+                  key={map.id}
+                  onClick={() => selectMap(map.id)}
+                  disabled={isRoundActive}
+                  className={`w-full text-left rounded border p-2 transition-colors ${
+                    mapId === map.id
+                      ? 'bg-emerald-600/20 border-emerald-400 text-emerald-100'
+                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  } ${isRoundActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="text-xs font-bold uppercase tracking-wide">{map.label}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{map.description}</div>
                 </button>
               ))}
             </div>
