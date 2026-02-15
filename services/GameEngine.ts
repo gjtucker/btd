@@ -8,6 +8,7 @@ interface Bloon {
   y: number;
   nodeIndex: number;
   distanceTraveled: number;
+  health: number;
   frozen: number;
   glued: number;
   onFire: number;
@@ -324,7 +325,7 @@ export class GameEngine {
     switch (tower.strategy) {
       case TargetStrategy.First: return inRange.reduce((p, c) => (c.distanceTraveled > p.distanceTraveled ? c : p));
       case TargetStrategy.Last: return inRange.reduce((p, c) => (c.distanceTraveled < p.distanceTraveled ? c : p));
-      case TargetStrategy.Strong: return inRange.reduce((p, c) => (BLOON_STATS[c.type].health > BLOON_STATS[p.type].health ? c : p));
+      case TargetStrategy.Strong: return inRange.reduce((p, c) => (c.health > p.health ? c : p));
       case TargetStrategy.Close: return inRange.reduce((p, c) => ((c.x - tower.x)**2 + (c.y - tower.y)**2 < (p.x - tower.x)**2 + (p.y - tower.y)**2 ? c : p));
       default: return inRange[0];
     }
@@ -360,24 +361,41 @@ export class GameEngine {
   }
 
   private damageBloon(index: number, damage: number, type: DamageType, towerId: number) {
-     if (index === -1) return;
+     if (index === -1 || damage <= 0) return;
      const bloon = this.bloons[index];
      const stats = BLOON_STATS[bloon.type];
      if (stats.immunities.includes(type)) return;
-     this.money += stats.money;
+
      const tower = this.towers.find(t => t.id === towerId);
-     if (tower) tower.totalDamageDealt++;
+     if (tower) tower.totalDamageDealt += damage;
+
+     if (bloon.health > damage) {
+         bloon.health -= damage;
+         this.onStateChange();
+         return;
+     }
 
      const px = bloon.x; const py = bloon.y; const pn = bloon.nodeIndex; const pd = bloon.distanceTraveled;
+     this.money += stats.money;
+     const carryDamage = damage - bloon.health;
      this.bloons.splice(index, 1);
 
+     const spawnedChildren: Bloon[] = [];
      if (stats.children.length > 0) {
          stats.children.forEach((childType, childIndex) => {
              for (let k = 0; k < stats.childCount; k++) {
                  this.spawnChild(childType, px, py, pn, pd - ((childIndex * stats.childCount + k) * 10));
+                 const child = this.bloons[this.bloons.length - 1];
+                 if (child) spawnedChildren.push(child);
              }
          });
      }
+
+     if (carryDamage > 0 && spawnedChildren.length === 1) {
+         this.damageBloon(this.bloons.findIndex(b => b.id === spawnedChildren[0].id), carryDamage, type, towerId);
+         return;
+     }
+
      this.onStateChange();
   }
 
@@ -393,12 +411,12 @@ export class GameEngine {
   private spawnWaveBloon(type: BloonColor) {
       this.bloons.push({
           id: ++this.bloonIdCounter, type, x: PATH_NODES[0].x, y: PATH_NODES[0].y,
-          nodeIndex: 0, distanceTraveled: 0, frozen: 0, glued: 0, onFire: 0
+          nodeIndex: 0, distanceTraveled: 0, health: BLOON_STATS[type].health, frozen: 0, glued: 0, onFire: 0
       });
   }
 
   private spawnChild(type: BloonColor, x: number, y: number, nodeIndex: number, distanceTraveled: number) {
-      this.bloons.push({ id: ++this.bloonIdCounter, type, x, y, nodeIndex, distanceTraveled, frozen: 0, glued: 0, onFire: 0 });
+      this.bloons.push({ id: ++this.bloonIdCounter, type, x, y, nodeIndex, distanceTraveled, health: BLOON_STATS[type].health, frozen: 0, glued: 0, onFire: 0 });
   }
 
   createParticle(x: number, y: number, color: string, size: number) {
@@ -416,6 +434,8 @@ export class GameEngine {
           case BloonColor.White: return '#f3f4f6';
           case BloonColor.Lead: return '#6b7280';
           case BloonColor.Zebra: return '#111827';
+          case BloonColor.Rainbow: return '#6366f1';
+          case BloonColor.Ceramic: return '#fdba74';
           default: return '#ef4444';
       }
   }
@@ -600,11 +620,35 @@ export class GameEngine {
           }
       }
 
+      if (b.type === BloonColor.Rainbow) {
+          const stripeColors = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'];
+          ctx.lineWidth = 2;
+          stripeColors.forEach((stripe, idx) => {
+              const y = b.y - stats.r * 0.6 + idx * (stats.r * 0.3);
+              ctx.strokeStyle = stripe;
+              ctx.beginPath();
+              ctx.moveTo(b.x - stats.r * 0.55, y);
+              ctx.lineTo(b.x + stats.r * 0.55, y);
+              ctx.stroke();
+          });
+      }
+
       if (b.type === BloonColor.Lead) {
           ctx.strokeStyle = 'rgba(255,255,255,0.4)';
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(b.x, b.y, stats.r * 0.55, -Math.PI / 2.5, Math.PI / 2.5);
+          ctx.stroke();
+      }
+
+      if (b.type === BloonColor.Ceramic) {
+          ctx.strokeStyle = '#7c2d12';
+          ctx.lineWidth = 2;
+          const crackDepth = 1 - (b.health / Math.max(1, stats.health));
+          ctx.beginPath();
+          ctx.moveTo(b.x - stats.r * 0.45, b.y - stats.r * 0.25);
+          ctx.lineTo(b.x - stats.r * 0.1, b.y + stats.r * (0.1 + crackDepth * 0.2));
+          ctx.lineTo(b.x + stats.r * 0.3, b.y - stats.r * 0.05);
           ctx.stroke();
       }
 
