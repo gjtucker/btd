@@ -71,6 +71,29 @@ const App: React.FC = () => {
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
   }, [updateStats, difficulty]);
 
+  const syncSelectedTowerStats = useCallback((towerId: number | null) => {
+    if (!engineRef.current || towerId === null) {
+      setActiveTowerStats(null);
+      return;
+    }
+
+    const tower = engineRef.current.towers.find((existingTower) => existingTower.id === towerId);
+    if (!tower) {
+      setSelectedTowerId(null);
+      setActiveTowerStats(null);
+      engineRef.current.selectedTowerId = null;
+      return;
+    }
+
+    setActiveTowerStats({
+      id: tower.id,
+      damage: tower.totalDamageDealt,
+      strategy: tower.strategy,
+      upgrades: tower.config.upgrades,
+      currentIdx: tower.currentUpgrades,
+    });
+  }, []);
+
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !engineRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -88,10 +111,11 @@ const App: React.FC = () => {
         if (clickedTower) {
             setSelectedTowerId(clickedTower.id);
             engineRef.current.selectedTowerId = clickedTower.id;
+            syncSelectedTowerStats(clickedTower.id);
         } else {
             setSelectedTowerId(null);
-            setActiveTowerStats(null);
             engineRef.current.selectedTowerId = null;
+            syncSelectedTowerStats(null);
         }
     }
   };
@@ -106,7 +130,7 @@ const App: React.FC = () => {
   };
 
   const startRound = () => engineRef.current?.startRound();
-  const sellSelectedTower = () => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); } };
+  const sellSelectedTower = () => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } };
   const changeStrategy = () => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } };
   const buyUpgrade = () => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } };
 
