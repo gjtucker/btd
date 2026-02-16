@@ -59,6 +59,32 @@ interface Particle {
   size: number;
 }
 
+interface SerializedProjectile extends Omit<Projectile, 'hitBloons'> {
+  hitBloons: number[];
+}
+
+export interface SerializedGameState {
+  bloons: Bloon[];
+  towers: Tower[];
+  projectiles: SerializedProjectile[];
+  particles: Particle[];
+  money: number;
+  lives: number;
+  round: number;
+  isRoundActive: boolean;
+  isGameOver: boolean;
+  hoverPos: Point | null;
+  selectedTowerPlacement: TowerConfig | null;
+  selectedTowerId: number | null;
+  bloonIdCounter: number;
+  projectileIdCounter: number;
+  waveGroupIndex: number;
+  waveCountRemaining: number;
+  waveTimer: number;
+  difficulty: GameDifficulty;
+  mapId: GameMapId;
+}
+
 const SIMULATION_FPS = 60;
 const MIN_EVENT_SPACING_SECONDS = 0.0001;
 
@@ -883,5 +909,66 @@ export class GameEngine {
       B = (num >> 8 & 0x00FF) + amt,
       G = (num & 0x0000FF) + amt;
       return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1);
+  }
+
+  serializeState(): SerializedGameState {
+    return {
+      bloons: this.bloons,
+      towers: this.towers,
+      projectiles: this.projectiles.map((projectile) => ({
+        ...projectile,
+        hitBloons: [...projectile.hitBloons],
+      })),
+      particles: this.particles,
+      money: this.money,
+      lives: this.lives,
+      round: this.round,
+      isRoundActive: this.isRoundActive,
+      isGameOver: this.isGameOver,
+      hoverPos: this.hoverPos,
+      selectedTowerPlacement: this.selectedTowerPlacement,
+      selectedTowerId: this.selectedTowerId,
+      bloonIdCounter: this.bloonIdCounter,
+      projectileIdCounter: this.projectileIdCounter,
+      waveGroupIndex: this.waveGroupIndex,
+      waveCountRemaining: this.waveCountRemaining,
+      waveTimer: this.waveTimer,
+      difficulty: this.difficulty,
+      mapId: this.mapId,
+    };
+  }
+
+  restoreState(state: SerializedGameState) {
+    const mapId = state.mapId in MAPS ? state.mapId : DEFAULT_MAP_ID;
+    const difficulty = state.difficulty in DIFFICULTY_PRESETS ? state.difficulty : GameDifficulty.Medium;
+
+    this.mapId = mapId;
+    this.currentMap = MAPS[mapId];
+    this.difficulty = difficulty;
+    this.difficultyPreset = DIFFICULTY_PRESETS[difficulty];
+
+    this.bloons = state.bloons;
+    this.towers = state.towers;
+    this.projectiles = state.projectiles.map((projectile) => ({
+      ...projectile,
+      hitBloons: new Set(projectile.hitBloons),
+    }));
+    this.particles = state.particles;
+    this.money = state.money;
+    this.lives = state.lives;
+    this.round = state.round;
+    this.isRoundActive = state.isRoundActive;
+    this.isGameOver = state.isGameOver;
+    this.hoverPos = state.hoverPos;
+    this.selectedTowerPlacement = state.selectedTowerPlacement;
+    this.selectedTowerId = state.selectedTowerId;
+
+    this.bloonIdCounter = state.bloonIdCounter;
+    this.projectileIdCounter = state.projectileIdCounter;
+    this.waveGroupIndex = state.waveGroupIndex;
+    this.waveCountRemaining = state.waveCountRemaining;
+    this.waveTimer = state.waveTimer;
+
+    this.onStateChange();
   }
 }
