@@ -14,7 +14,8 @@ test.describe('gameplay regression coverage', () => {
     page.on('dialog', (dialog) => dialog.accept());
 
     await page.goto('/');
-    await page.getByRole('button', { name: 'Hard' }).click();
+    await page.getByRole('button', { name: 'Intel' }).click();
+    await page.locator('select').first().selectOption('HARD');
 
     await expect(page.getByTestId('money')).toHaveText('500');
     await expect(page.getByTestId('lives')).toHaveText('75');

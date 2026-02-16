@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
-import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, TOWERS } from './constants';
+import { ThreeRenderer } from './services/ThreeRenderer';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, TOWERS, MAPS } from './constants';
 import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
@@ -12,6 +13,7 @@ const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const threeRendererRef = useRef<ThreeRenderer | null>(null);
   const requestRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
   const midiRef = useRef<MidiBackgroundMusic | null>(null);
@@ -27,6 +29,7 @@ const App: React.FC = () => {
   const [selectedTowerType, setSelectedTowerType] = useState<TowerConfig | null>(null);
   const [activeTowerStats, setActiveTowerStats] = useState<{id: number, damage: number, strategy: string, upgrades: Upgrade[], currentIdx: number, isFarm: boolean} | null>(null);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('build');
+  const [isRendererReady, setIsRendererReady] = useState(false);
   const [roundPreview, setRoundPreview] = useState<string[]>([]);
   const [isMusicEnabled, setIsMusicEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -93,6 +96,13 @@ const App: React.FC = () => {
   useEffect(() => {
     const engine = new GameEngine(() => updateStatsRef.current(), difficulty, mapId);
     engineRef.current = engine;
+
+    if (containerRef.current) {
+      threeRendererRef.current = new ThreeRenderer(containerRef.current);
+      threeRendererRef.current.initScene(engine.getMap());
+      setIsRendererReady(true);
+    }
+
     updateStatsRef.current();
 
     const animate = (time: number) => {
@@ -100,10 +110,14 @@ const App: React.FC = () => {
       const safeDt = Math.min(dt, 0.1); 
       if (engineRef.current) {
         engineRef.current.update(safeDt);
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (ctx) {
-          engineRef.current.draw(ctx);
+        if (threeRendererRef.current) {
+          threeRendererRef.current.render(engineRef.current);
+        } else {
+          const canvas = canvasRef.current;
+          const ctx = canvas?.getContext('2d');
+          if (ctx) {
+            engineRef.current.draw(ctx);
+          }
         }
       }
       lastTimeRef.current = time;
@@ -112,6 +126,7 @@ const App: React.FC = () => {
     requestRef.current = requestAnimationFrame(animate);
     return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        threeRendererRef.current?.dispose();
     };
   }, [difficulty, mapId]);
 
@@ -152,6 +167,10 @@ const App: React.FC = () => {
   const getGameCoordinates = useCallback((clientX: number, clientY: number) => {
     const screenPoint = getCanvasCoordinates(clientX, clientY);
     if (!screenPoint) return null;
+
+    if (threeRendererRef.current) {
+      return threeRendererRef.current.screenToWorld(screenPoint.x, screenPoint.y);
+    }
 
     return screenPoint;
   }, [getCanvasCoordinates]);
@@ -497,12 +516,14 @@ const App: React.FC = () => {
               onPointerMove={handlePointerMove}
               className="cursor-crosshair block w-full touch-none aspect-[800/520]"
             >
-              <canvas
-                ref={canvasRef}
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
-                className="block w-full h-full"
-              />
+              {!isRendererReady && (
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  className="block w-full h-full"
+                />
+              )}
             </div>
             {round === 1 && !isRoundActive && !selectedTowerType && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full text-xs font-bold backdrop-blur-lg pointer-events-none flex items-center gap-3 border border-slate-700 shadow-2xl animate-bounce">
