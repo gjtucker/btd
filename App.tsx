@@ -172,12 +172,6 @@ const App: React.FC = () => {
     } else {
       const clickedTower = engineRef.current.towers
         .map((tower) => {
-          if (threeRendererRef.current) {
-            const projectedTowerCenter = threeRendererRef.current.worldToScreen(tower.x, tower.y, 20);
-            const distance = Math.hypot(projectedTowerCenter.x - screenCoords.x, projectedTowerCenter.y - screenCoords.y);
-            return distance <= 28 ? { tower, distance } : null;
-          }
-
           const distance = Math.hypot(tower.x - coords.x, tower.y - coords.y);
           return distance <= 25 ? { tower, distance } : null;
         })
