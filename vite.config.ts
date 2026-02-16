@@ -2,22 +2,10 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const githubRepository = process.env.GITHUB_REPOSITORY;
-const derivedPagesBase = (() => {
-  if (!githubRepository) return '/';
-
-  const [owner, repo] = githubRepository.split('/');
-  if (!owner || !repo) return '/';
-
-  return repo.toLowerCase() === `${owner.toLowerCase()}.github.io`
-    ? '/'
-    : `/${repo}/`;
-})();
-
 export default defineConfig({
-  // Use a relative base path so the build works on both project pages
-  // (/<repo>/) and user/org pages (/), as well as custom domains.
-  base: process.env.BASE_PATH ?? derivedPagesBase,
+  // Relative base keeps built assets loading correctly whether the app is
+  // hosted at domain root, in a GitHub Pages project subpath, or a custom domain.
+  base: process.env.BASE_PATH ?? './',
   server: {
     port: 3000,
     host: '0.0.0.0',

@@ -32,14 +32,14 @@ For a step-by-step checklist, see [`docs/GITHUB_PAGES_SETUP.md`](docs/GITHUB_PAG
 
 ### Notes
 
-- For project pages (`https://<user>.github.io/<repo>/`), the workflow builds with the correct base path automatically.
-- If you later use a custom domain or user/organization pages root, you can adjust the `BASE_PATH` value in `.github/workflows/deploy-pages.yml`.
+- The Vite build uses a relative asset base by default, so the same build works for project pages (`https://<user>.github.io/<repo>/`), user/org pages (`https://<user>.github.io/`), and custom domains.
+- If needed, you can still override the base via `BASE_PATH` at build time.
 
 ### Troubleshooting GitHub Pages
 
 - Ensure the repository is **Public** (recommended for easiest GitHub Pages setup) and that **Settings → Pages → Source** is set to **GitHub Actions**.
 - Confirm the deploy workflow runs on pushes to `main`.
-- If the site loads but has missing assets, verify `BASE_PATH` in `.github/workflows/deploy-pages.yml` matches your repository name.
+- If the site loads but has missing assets, check the browser network tab for 404s and verify the deployed `dist/` files include the referenced `assets/*` bundle files.
 
 ## Checking git history for sensitive data
 
