@@ -1,12 +1,26 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GameEngine } from './services/GameEngine';
+import { GameEngine, SerializedGameState } from './services/GameEngine';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
 import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, TOWERS } from './constants';
 import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
 const MUSIC_ENABLED_STORAGE_KEY = 'btd-music-enabled';
+const GAME_STATE_STORAGE_KEY = 'btd-game-state';
 type MobilePanel = 'build' | 'intel' | 'tower';
+
+const loadSavedGameState = (): SerializedGameState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const rawState = window.localStorage.getItem(GAME_STATE_STORAGE_KEY);
+    if (!rawState) return null;
+    return JSON.parse(rawState) as SerializedGameState;
+  } catch {
+    return null;
+  }
+};
+
+const initialSavedState = loadSavedGameState();
 
 const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,11 +30,11 @@ const App: React.FC = () => {
   const lastTimeRef = useRef<number>(0);
   const midiRef = useRef<MidiBackgroundMusic | null>(null);
 
-  const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.Medium);
-  const [mapId, setMapId] = useState<GameMapId>(DEFAULT_MAP_ID);
-  const [money, setMoney] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
-  const [lives, setLives] = useState(DIFFICULTY_PRESETS[GameDifficulty.Medium].startingLives);
-  const [round, setRound] = useState(1);
+  const [difficulty, setDifficulty] = useState<GameDifficulty>(initialSavedState?.difficulty ?? GameDifficulty.Medium);
+  const [mapId, setMapId] = useState<GameMapId>(initialSavedState?.mapId ?? DEFAULT_MAP_ID);
+  const [money, setMoney] = useState(initialSavedState?.money ?? DIFFICULTY_PRESETS[GameDifficulty.Medium].startingMoney);
+  const [lives, setLives] = useState(initialSavedState?.lives ?? DIFFICULTY_PRESETS[GameDifficulty.Medium].startingLives);
+  const [round, setRound] = useState(initialSavedState?.round ?? 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [selectedTowerId, setSelectedTowerId] = useState<number | null>(null);
@@ -92,6 +106,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const engine = new GameEngine(() => updateStatsRef.current(), difficulty, mapId);
+    if (initialSavedState && initialSavedState.difficulty === difficulty && initialSavedState.mapId === mapId) {
+      engine.restoreState(initialSavedState);
+    }
     engineRef.current = engine;
     updateStatsRef.current();
 
@@ -113,6 +130,19 @@ const App: React.FC = () => {
     return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
+  }, [difficulty, mapId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !engineRef.current) return;
+
+    const saveState = () => {
+      if (!engineRef.current) return;
+      window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(engineRef.current.serializeState()));
+    };
+
+    saveState();
+    const intervalId = window.setInterval(saveState, 1000);
+    return () => window.clearInterval(intervalId);
   }, [difficulty, mapId]);
 
   const syncSelectedTowerStats = useCallback((towerId: number | null) => {
