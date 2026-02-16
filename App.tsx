@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './services/GameEngine';
 import { MidiBackgroundMusic } from './services/MidiBackgroundMusic';
-import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, TOWERS } from './constants';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_MAP_ID, DIFFICULTY_PRESETS, MAPS, TOWERS } from './constants';
 import { BloonColor, GameDifficulty, GameMapId, TowerConfig, Upgrade } from './types';
 import { Play, RotateCcw, DollarSign, Heart, Trophy, Zap, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 
