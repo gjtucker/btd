@@ -327,6 +327,11 @@ export class GameEngine {
         const cooldownSeconds = Math.max(MIN_EVENT_SPACING_SECONDS, tower.dynamicCooldown / SIMULATION_FPS);
 
         if (tower.config.id === 'FARM') {
+          if (!this.isRoundActive) {
+            tower.cooldownTimer = 0;
+            break;
+          }
+
           this.money += tower.dynamicIncome;
           tower.totalDamageDealt += tower.dynamicIncome;
           tower.cooldownTimer += cooldownSeconds;
