@@ -232,6 +232,27 @@ const App: React.FC = () => {
     if (isMusicEnabled) midiRef.current?.start();
     engineRef.current?.startRound();
   }, [isMusicEnabled]);
+  const resetGame = useCallback((skipConfirmation: boolean = false) => {
+    if (!engineRef.current) return;
+
+    if (!skipConfirmation) {
+      const confirmed = window.confirm('Restart the current game? Your saved progress for this run will be cleared.');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    engineRef.current.setDifficulty(difficulty);
+    setSelectedTowerId(null);
+    setSelectedTowerType(null);
+    syncSelectedTowerStats(null);
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+    }
+
+    updateStatsRef.current();
+  }, [difficulty, syncSelectedTowerStats]);
   const sellSelectedTower = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.sellTower(selectedTowerId); setSelectedTowerId(null); syncSelectedTowerStats(null); } }, [selectedTowerId, syncSelectedTowerStats]);
   const changeStrategy = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.changeStrategy(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
   const buyUpgrade = useCallback(() => { if (selectedTowerId !== null) { engineRef.current?.upgradeTower(selectedTowerId); updateStats(); } }, [selectedTowerId, updateStats]);
@@ -488,18 +509,27 @@ const App: React.FC = () => {
 
         <div className="p-3 lg:p-4 border-t border-slate-700 bg-slate-900">
           {!isGameOver ? (
-            <button
-              onClick={startRound}
-              disabled={isRoundActive}
-              data-testid="start-round"
-              className={`w-full py-4 rounded-xl font-black text-lg shadow-2xl flex items-center justify-center gap-2 transition-all transform active:scale-95 uppercase tracking-wider ${
-                isRoundActive ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white shadow-green-900/40 ring-2 ring-green-400/20'
-              }`}
-            >
-              {isRoundActive ? "Hostiles Inbound..." : <><Play className="w-5 h-5 fill-current" /> Deploy Round {round}</>}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                onClick={startRound}
+                disabled={isRoundActive}
+                data-testid="start-round"
+                className={`w-full py-4 rounded-xl font-black text-lg shadow-2xl flex items-center justify-center gap-2 transition-all transform active:scale-95 uppercase tracking-wider ${
+                  isRoundActive ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white shadow-green-900/40 ring-2 ring-green-400/20'
+                }`}
+              >
+                {isRoundActive ? "Hostiles Inbound..." : <><Play className="w-5 h-5 fill-current" /> Deploy Round {round}</>}
+              </button>
+              <button
+                onClick={() => resetGame()}
+                data-testid="restart-game"
+                className="w-full py-4 rounded-xl font-black text-lg bg-slate-700 hover:bg-slate-600 text-slate-100 shadow-xl border border-slate-500/60 flex items-center justify-center gap-2 transition-colors uppercase tracking-wider"
+              >
+                <RotateCcw className="w-5 h-5" /> Restart
+              </button>
+            </div>
           ) : (
-              <button onClick={() => window.location.reload()} className="w-full py-4 rounded-xl font-bold text-lg bg-red-600 hover:bg-red-500 text-white shadow-lg flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> Try Again</button>
+              <button onClick={() => resetGame(true)} className="w-full py-4 rounded-xl font-bold text-lg bg-red-600 hover:bg-red-500 text-white shadow-lg flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> Try Again</button>
           )}
         </div>
       </div>
@@ -511,7 +541,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
                     <h2 className="text-8xl font-black text-red-600 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)] mb-4 animate-pulse uppercase italic">Defeat</h2>
                     <p className="text-2xl text-slate-300 tracking-widest font-mono">You survived until Round {round}</p>
-                    <button onClick={() => window.location.reload()} className="mt-8 px-8 py-3 bg-red-600 text-white font-black rounded uppercase hover:bg-red-500 transition-colors">Return to Base</button>
+                    <button onClick={() => resetGame(true)} className="mt-8 px-8 py-3 bg-red-600 text-white font-black rounded uppercase hover:bg-red-500 transition-colors">Return to Base</button>
                 </div>
             )}
             <div
